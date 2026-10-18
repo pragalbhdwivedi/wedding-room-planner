@@ -12,15 +12,17 @@ def project_edit(before,fid,body):
     family.update({k:body[k] for k in ['label','side','reserved_eligible','couple_children']})
     existing={g['id'] for g in before['guests'] if g['family_id']==fid}
     supplied=[str(m['id']) for m in body['members'] if m.get('id')]
-    if len(supplied)!=len(set(supplied)) or not existing.issubset(supplied) or not set(supplied).issubset(existing):
-        raise ValueError('Keep every existing guest slot exactly once in its own family.')
+    if len(supplied)!=len(set(supplied)) or not set(supplied).issubset(existing):
+        raise ValueError('A guest slot is duplicated or belongs to another family.')
+    removed=sorted(existing-set(supplied))
     people=[]
     for member in body['members']:
         g={**member,'id':str(member.get('id') or uuid.uuid4()),'family_id':fid,'side':family['side'],'group_label':family['label'],'reserved_eligible':family['reserved_eligible'],'couple_children':family['couple_children']}
         people.append(g)
     data['guests']=[g for g in data['guests'] if g['family_id']!=fid]+people
+    data['links']=[link for link in data['links'] if link['a'] not in removed and link['b'] not in removed]
     if len(data['guests'])>1000:raise ValueError('This event supports at most 1,000 guest slots.')
-    return data,{'family':family,'guests':people}
+    return data,{'family':family,'guests':people,'removed_guest_ids':removed}
 
 
 def changed_rows(before,after):
@@ -30,7 +32,7 @@ def changed_rows(before,after):
 
 
 def repair_placements(before,data,fid):
-    old=before['assignments'];gmap={g['id']:g for g in data['guests']}
+    gmap={g['id']:g for g in data['guests']};old=[a for a in before['assignments'] if a['guest_id'] in gmap]
     ids={g['id'] for g in data['guests'] if g['family_id']==fid}
     # Include hard must-share companions and their households in the repair unit.
     while True:
@@ -57,11 +59,11 @@ def repair_placements(before,data,fid):
         options[n]=[c[-1] for c in sorted(candidates)]
     # Prefer one room for the whole stay, then try a bounded set of dated choices.
     common=set.intersection(*(set(options[n]) for n in nights)) if nights else set()
-    attempts=[{n:rid for n in nights} for rid in sorted(common)]
+    attempts=[{n:rid for n in nights} for rid in options[nights[0]] if rid in common] if nights else []
     attempts += [dict(zip(nights,p)) for p in islice(product(*(options[n][:12] for n in nights)),144)]
     attempts.append({n:None for n in nights})
     for choice in attempts:
         after=rows(choice)
-        if not validate(data,after,before=old)['errors']:
+        if not validate(data,after,before=before['assignments'])['errors']:
             return after,('Details require a placement correction. Review the proposed room changes before saving.' if any(choice.values()) else 'No valid local room move was found. Review saving these details and leaving the affected household unassigned; locks and mandatory rules still apply.')
     return None,'Existing locks or linked placement rules prevent a safe correction. Keep this form open; unlock or arrange the affected rooms before saving.'

@@ -126,6 +126,7 @@ type Preview = {
   family_edit?: boolean;
   reason?: string;
   edited_guests?: Guest[];
+  removed_guest_ids?: string[];
   changes?: {
     guest_id: string;
     night: string;
@@ -2670,13 +2671,15 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
             </p>
             <div className="member-cards">
               {familyDraft.members.map((g: any, i: number) => {
-                const edit = (key: string, value: any) =>
+                const editFields = (patch: Record<string, any>) =>
                   setFamilyDraft((d: any) => ({
                     ...d,
                     members: d.members.map((m: any, j: number) =>
-                      j === i ? { ...m, [key]: value } : m,
+                      j === i ? { ...m, ...patch } : m,
                     ),
                   }));
+                const edit = (key: string, value: any) =>
+                  editFields({ [key]: value });
                 return (
                   <fieldset key={g.id || i}>
                     <legend>
@@ -2701,16 +2704,21 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                           max={120}
                           step={1}
                           value={g.age}
-                          onChange={(e) => edit("age", e.target.value)}
+                          onChange={(e) => {
+                            const age = e.target.value;
+                            editFields({
+                              age,
+                              age_band: age === "" ? "unknown" : Number(age) > 10 ? "adult" : "child",
+                            });
+                          }}
                           placeholder="Unknown"
                         />
                       </label>
                       <label>
                         Adult / child count
                         <select
-                          value={g.age_band || "unknown"}
-                          onChange={(e) => edit("age_band", e.target.value)}
-                          disabled={g.age !== ""}
+                          value={g.age === "" ? g.age_band || "unknown" : Number(g.age) > 10 ? "adult" : "child"}
+                          onChange={(e) => editFields({ age: "", age_band: e.target.value })}
                         >
                           <option value="unknown">Unknown</option>
                           <option value="adult">Adult (above 10)</option>
@@ -2852,26 +2860,34 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                         onChange={(e) => edit("notes", e.target.value)}
                       />
                     </label>
-                    {!g.id && familyDraft.members.length > 1 && (
+                    {familyDraft.members.length > 1 && (
                       <button
                         type="button"
-                        className="text-button"
-                        onClick={() =>
+                        className="text-button delete-member"
+                        onClick={() => {
                           setFamilyDraft({
                             ...familyDraft,
                             members: familyDraft.members.filter(
                               (_: any, j: number) => j !== i,
                             ),
-                          })
-                        }
+                          });
+                        }}
                       >
-                        Remove new slot
+                        {g.id ? "Delete member" : "Remove new slot"}
                       </button>
                     )}
                   </fieldset>
                 );
               })}
             </div>
+            {familyDraft.id && data.guests.some((g) =>
+              g.family_id === familyDraft.id &&
+              !familyDraft.members.some((m: any) => m.id === g.id),
+            ) && (
+              <div className="alert">
+                Member deletion is pending. Review the affected rooms and confirm with “Apply reviewed change” after saving. Closing this form cancels the deletion.
+              </div>
+            )}
             <div className="dialog-actions">
               <button
                 type="button"
@@ -2964,6 +2980,9 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
           {preview.reason && <p className="alert">{preview.reason}</p>}
           {preview.family_edit && (
             <div className="edited-details">
+              {!!preview.removed_guest_ids?.length && (
+                <p><b>Delete {preview.removed_guest_ids.length} member{preview.removed_guest_ids.length === 1 ? "" : "s"}</b>. Their room placements, attendance and links will be removed; assignment undo history will reset.</p>
+              )}
               {preview.edited_guests?.map((g) => (
                 <p key={g.id}>
                   <b>{guestName(g)}</b> · Age {g.age ?? "pending"}

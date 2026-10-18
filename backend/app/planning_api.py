@@ -13,7 +13,7 @@ from sqlalchemy import delete, select
 from .billing import calculate
 from .family_edits import changed_rows, project_edit, repair_placements
 from .db import SessionLocal, database
-from .models import (AllocationRun, Audit, BillSnapshot, BillingSettings, EventAttendance, EventPolicy, Family, FunctionEvent, Guest, GuestLink, GuestPresence,
+from .models import (AllocationRun, Assignment, Audit, BillSnapshot, BillingSettings, EventAttendance, EventPolicy, Family, FunctionEvent, Guest, GuestLink, GuestPresence,
                      HotelChargeDay, LoginSession, MealAttendance, PendingChange, PlanChange, PlanState,
                      PlanningRule, Resource, Room, RoomConnection, RoomLock, User, WeddingDetails, now)
 from .planning_rules import DAYS, NIGHTS, validate
@@ -140,12 +140,22 @@ def update_family(family_id:uuid.UUID,body:FamilyInput,user:Owner,db:DB):
                 if key not in source.model_fields_set:member[key]=old[key]
     try:data,payload=project_edit(before,str(family_id),draft)
     except ValueError as error:raise HTTPException(400,str(error))
-    checked=validate(data,before['assignments'],before=before['assignments'])
+    removed=set(payload['removed_guest_ids'])
+    base=[a for a in before['assignments'] if a['guest_id'] not in removed]
+    checked=validate(data,base,before=before['assignments'])
     old={w['id'] for w in validate(before,before['assignments'])['warnings']}
-    if not checked['errors'] and not [w for w in checked['warnings'] if w['id'] not in old]:
+    added={g['id'] for g in payload['guests']}-{g['id'] for g in before['guests']}
+    placed_family=bool(added and all(g['age_band']!='unknown' for g in payload['guests'] if g['id'] in added) and any(a['guest_id'] in {g['id'] for g in before['guests'] if g['family_id']==str(family_id)} for a in before['assignments']))
+    if not removed and not placed_family and not checked['errors'] and not [w for w in checked['warnings'] if w['id'] not in old]:
         persist_family_edit(db,payload)
         return record(db,user,state,'family.updated',{'family_id':str(family_id),'slots':len(body.members)})
-    after,reason=(repair_placements(before,data,str(family_id)) if checked['errors'] else (before['assignments'],'Review the new placement warnings before saving these details.'))
+    after,reason=(repair_placements(before,data,str(family_id)) if checked['errors'] or placed_family else (base,'Review the guest changes and any placement warnings before saving.'))
+    if after is None and not checked['errors']:
+        after,reason=base,'No safe room placement is available for the added guest. Review saving them unassigned.'
+    if not checked['errors'] and after is not None and len(after)<len(base):
+        after,reason=base,'The new member cannot be placed with the existing family safely. Review saving them unassigned.'
+    if placed_family and not checked['errors'] and after!=base and after is not None:
+        reason='Review the proposed room placement for the added member before saving.'
     if after is None:raise HTTPException(409,{'message':reason,'errors':checked['errors']})
     if checked['errors']:reason=' '.join(dict.fromkeys(e['message'] for e in checked['errors']))+' '+reason
     result=validate(data,after,before=before['assignments'])
@@ -153,12 +163,20 @@ def update_family(family_id:uuid.UUID,body:FamilyInput,user:Owner,db:DB):
     pending=PendingChange(owner_id=user.id,revision=body.revision,kind='family_edit',payload={**payload,'after':after},warnings=warnings,expires_at=now()+timedelta(minutes=5))
     db.add(pending);db.commit()
     from .planning_rules import summaries
-    return {'family_edit':True,'token':str(pending.id),'revision':body.revision,'errors':[],'warnings':warnings,'summary':summaries(data,after),'changes':changed_rows(before['assignments'],after),'reason':reason,'edited_guests':[{'id':g['id'],'name':g['name'],'age':g['age'],'group_label':g['group_label'],'age_band':g['age_band'],'tags':g['tags']} for g in payload['guests']]}
+    return {'family_edit':True,'token':str(pending.id),'revision':body.revision,'errors':[],'warnings':warnings,'summary':summaries(data,after),'changes':changed_rows(before['assignments'],after),'reason':reason,'removed_guest_ids':payload['removed_guest_ids'],'edited_guests':[{'id':g['id'],'name':g['name'],'age':g['age'],'group_label':g['group_label'],'age_band':g['age_band'],'tags':g['tags']} for g in payload['guests']]}
 
 
 def persist_family_edit(db,payload):
     f=payload['family'];family=db.get(Family,uuid.UUID(f['id']))
     for key in ['label','side','reserved_eligible','couple_children']:setattr(family,key,f[key])
+    for guest_id in payload.get('removed_guest_ids',[]):
+        gid=uuid.UUID(guest_id)
+        db.execute(delete(Assignment).where(Assignment.guest_id==gid))
+        db.execute(delete(GuestLink).where((GuestLink.a==gid)|(GuestLink.b==gid)))
+        db.execute(delete(GuestPresence).where(GuestPresence.guest_id==gid))
+        db.execute(delete(MealAttendance).where(MealAttendance.guest_id==gid))
+        db.execute(delete(EventAttendance).where(EventAttendance.guest_id==gid))
+        db.delete(db.get(Guest,gid))
     for g in payload['guests']:
         row=db.get(Guest,uuid.UUID(g['id']))
         if not row:row=Guest(id=uuid.UUID(g['id']),family_id=family.id);db.add(row)
@@ -177,10 +195,16 @@ def apply_family_edit(body:ApplyInput,user:Owner,db:DB):
     expected={w['id'] for w in result['warnings'] if w['id'] not in old}
     if expected!={w['id'] for w in pending.warnings} or set(body.acknowledged)!=expected:raise HTTPException(409,'Acknowledge exactly the warnings in this guest-edit preview.')
     if after!=before['assignments']:
-        change=PlanChange(parent=state.cursor,actor_id=user.id,before=before['assignments'],after=after);db.add(change);db.flush();state.cursor=change.id;state.redo=[]
+        if pending.payload.get('removed_guest_ids'):
+            # A deleted identity cannot safely reappear through assignment undo/redo.
+            state.cursor=None;state.redo=[]
+        else:
+            change=PlanChange(parent=state.cursor,actor_id=user.id,before=before['assignments'],after=after);db.add(change);db.flush();state.cursor=change.id;state.redo=[]
         save_assignments(db,after)
+    elif pending.payload.get('removed_guest_ids'):
+        state.cursor=None;state.redo=[]
     fid=pending.payload['family']['id'];db.delete(pending)
-    return record(db,user,state,'family.updated_with_placement',{'family_id':fid,'warning_ids':sorted(expected),'placement_changes':len(changed_rows(before['assignments'],after))})
+    return record(db,user,state,'family.updated_with_placement',{'family_id':fid,'warning_ids':sorted(expected),'placement_changes':len(changed_rows(before['assignments'],after)),'deleted_guest_ids':pending.payload.get('removed_guest_ids',[])})
 
 
 
