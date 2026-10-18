@@ -119,6 +119,8 @@ type Preview = {
   revision: number;
   errors: any[];
   warnings: Warning[];
+  can_confirm_sharing?: boolean;
+  request_moves?: { guest_id: string; night: string; resource_id: string | null }[];
   summary?: Record<string, any>;
   families?: number;
   guests?: number;
@@ -658,6 +660,15 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
     });
     if (result) openPreview(result);
     return result;
+  }
+  async function reviewSharing() {
+    if (!data || !preview?.request_moves) return;
+    const result = await action("/assignments/preview", {
+      revision: data.revision,
+      moves: preview.request_moves,
+      confirm_sharing: true,
+    });
+    if (result) openPreview(result);
   }
   function openRoomPicker(r: Resource) {
     if (!owner) return;
@@ -3045,8 +3056,27 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
             <div className="alert error" key={i}>
               {e.row ? `Row ${e.row}: ` : ""}
               {e.message}
+              {e.guest_ids?.length ? (
+                <small className="block">
+                  {e.guest_ids.map((id: string) => guestName(data.guests.find((g) => g.id === id))).join(" and ")}
+                </small>
+              ) : null}
+              {e.resource_ids?.length || e.night ? (
+                <small className="block">
+                  {e.night ? dayName(e.night) : ""}
+                  {e.resource_ids?.length ? ` · ${e.resource_ids.map((id: string) => {
+                    const room = data.resources.find((r) => r.id === id);
+                    return room ? roomName(room) : id;
+                  }).join(", ")}` : ""}
+                </small>
+              ) : null}
             </div>
           ))}
+          {preview.can_confirm_sharing && (
+            <button className="secondary" disabled={busy} onClick={reviewSharing}>
+              Review sharing with these people
+            </button>
+          )}
           {preview.changes && (
             <div className="table-wrap">
               <table className="planning-table">

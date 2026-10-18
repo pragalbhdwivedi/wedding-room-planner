@@ -16,7 +16,7 @@ from .db import SessionLocal, database
 from .models import (AllocationRun, Assignment, Audit, BillSnapshot, BillingSettings, EventAttendance, EventPolicy, Family, FunctionEvent, Guest, GuestLink, GuestPresence,
                      HotelChargeDay, LoginSession, MealAttendance, PendingChange, PlanChange, PlanState,
                      PlanningRule, Resource, Room, RoomConnection, RoomLock, User, WeddingDetails, now)
-from .planning_rules import DAYS, NIGHTS, validate
+from .planning_rules import DAYS, NIGHTS, issue, validate
 from .planning_store import assignments, hard_check, locked_state, save_assignments, snapshot, visible_plan
 from .security import COOKIE, current_user, digest, require_csrf, require_owner
 
@@ -372,7 +372,9 @@ class Move(Input):
     resource_id:str|None
 
 
-class Moves(Revision):moves:list[Move]=Field(min_length=1,max_length=2000)
+class Moves(Revision):
+    moves:list[Move]=Field(min_length=1,max_length=2000)
+    confirm_sharing:bool=False
 
 
 class Destinations(Revision):
@@ -393,12 +395,29 @@ def destinations(body:Destinations,user:Owner,db:DB):
     return {'revision':body.revision,'choices':choices}
 
 
-def preview_plan(db,user,revision,after,kind="assignment"):
-    locked_state(db,revision);before=snapshot(db);result=validate(before,after,before=before["assignments"])
+def sharing_warning(a,b):
+    return issue("sharing_confirmation", "Confirm these two people may share a room. Their compatibility link remains saved if you later undo this room move.", severity="warning", guests=[a,b])
+
+
+def with_sharing(data,pairs):
+    amended={**data,"links":[*data["links"],*({"a":a,"b":b,"kind":"may_share","severity":"hard"} for a,b in pairs)]}
+    return amended
+
+
+def sharing_candidates(data,after,moved_ids):
+    errors=validate(data,after,before=data["assignments"])["errors"]
+    pairs=sorted({tuple(sorted(e["guest_ids"])) for e in errors if e["code"]=="compatibility" and len(e["guest_ids"])==2 and set(e["guest_ids"]) & moved_ids})
+    if not pairs:return []
+    # Explicit consent cannot bypass a hard exclusion, Friends rule, capacity or any other mandatory rule.
+    return pairs if not validate(with_sharing(data,pairs),after,before=data["assignments"])["errors"] else []
+
+
+def preview_plan(db,user,revision,after,kind="assignment",sharing_pairs=()):
+    locked_state(db,revision);before=snapshot(db);result=validate(with_sharing(before,sharing_pairs),after,before=before["assignments"])
     if result["errors"]:return {"errors":result["errors"],"warnings":result["warnings"],"token":None,"revision":revision}
     old={w['id'] for w in validate(before,before['assignments'])['warnings']}
-    warnings=[w for w in result['warnings'] if w['id'] not in old]
-    pending=PendingChange(owner_id=user.id,revision=revision,kind=kind,payload={"after":after},warnings=warnings,expires_at=now()+timedelta(minutes=5))
+    warnings=[w for w in result['warnings'] if w['id'] not in old]+[sharing_warning(a,b) for a,b in sharing_pairs]
+    pending=PendingChange(owner_id=user.id,revision=revision,kind=kind,payload={"after":after,"sharing_pairs":list(sharing_pairs)},warnings=warnings,expires_at=now()+timedelta(minutes=5))
     db.add(pending);db.commit()
     old_rows={(a['guest_id'],a['night']):a['resource_id'] for a in before['assignments']}
     new_rows={(a['guest_id'],a['night']):a['resource_id'] for a in after}
@@ -423,7 +442,12 @@ def preview_moves(body:Moves,user:Owner,db:DB):
         if move.resource_id:current[key]={"guest_id":key[0],"night":key[1],"resource_id":move.resource_id}
         else:current.pop(key,None)
     after=sorted(current.values(),key=lambda a:(a["night"],a["guest_id"]))
-    return preview_plan(db,user,body.revision,after)
+    data=snapshot(db)
+    pairs=sharing_candidates(data,after,{str(move.guest_id) for move in body.moves})
+    result=preview_plan(db,user,body.revision,after,sharing_pairs=pairs if body.confirm_sharing else ())
+    result["can_confirm_sharing"]=bool(pairs) and not body.confirm_sharing
+    result["request_moves"]=[move.model_dump(mode="json") for move in body.moves]
+    return result
 
 
 
@@ -434,9 +458,11 @@ def apply_assignment(body:ApplyInput,user:Owner,db:DB):
     if not pending or pending.kind!="assignment" or pending.owner_id!=user.id or pending.expires_at<=now():raise HTTPException(409,"This preview expired or was already applied. Preview the move again.")
     if pending.revision!=state.revision:raise HTTPException(409,"The plan changed after preview. Preview again.")
     data=snapshot(db);before=data["assignments"];after=pending.payload["after"]
-    result=hard_check(data,after,before)
+    pairs=[tuple(pair) for pair in pending.payload.get("sharing_pairs",[])]
+    if pairs and pairs!=sharing_candidates(data,after,{g for pair in pairs for g in pair}):raise HTTPException(409,"Sharing consent changed. Preview the move again.")
+    result=hard_check(with_sharing(data,pairs),after,before)
     old={w['id'] for w in validate(data,before)['warnings']}
-    expected={w["id"] for w in result["warnings"] if w['id'] not in old}
+    expected={w["id"] for w in result["warnings"] if w['id'] not in old}|{sharing_warning(a,b)["id"] for a,b in pairs}
     if expected!={w["id"] for w in pending.warnings} or set(body.acknowledged)!=expected:raise HTTPException(409,"Explicitly acknowledge exactly the warnings in this preview.")
     direction=pending.payload.get('history_direction')
     if direction:
@@ -456,8 +482,10 @@ def apply_assignment(body:ApplyInput,user:Owner,db:DB):
         run=db.get(AllocationRun,uuid.UUID(pending.payload['allocation_run']))
         if not run or run.owner_id!=user.id or run.status!='completed' or run.revision!=state.revision:raise HTTPException(409,"Allocation proposal changed; run again")
         run.status='applied'
+    for a,b in pairs:
+        db.add(GuestLink(a=uuid.UUID(a),b=uuid.UUID(b),kind="may_share",severity="hard"))
     save_assignments(db,after);db.delete(pending)
-    return record(db,user,state,"assignment."+(direction or 'applied'),{"change_id":str(change.id),"warning_ids":sorted(expected)})
+    return record(db,user,state,"assignment."+(direction or 'applied'),{"change_id":str(change.id),"warning_ids":sorted(expected),"sharing_pairs":pairs})
 
 
 class HistoryInput(Revision):direction:Literal["undo","redo"]
