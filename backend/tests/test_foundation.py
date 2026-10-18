@@ -123,7 +123,7 @@ def test_inventory_reconciles_and_reserved_rooms_not_guessed(client, owner):
     assert len(d['staff_beds'])==12 and d['family_reserve_pending']==4
     assert all(r['number'] is None for r in rooms if r['hotel_id']=='second')
     assert d['cost_policy']['wyndham_allowance']==128 and d['cost_policy']['staff_meal_paise']==15000
-    assert d['allocation_available'] is False and d['guest_entry_available'] is False
+    assert d['allocation_available'] is True and d['guest_entry_available'] is True
 
 
 def test_login_throttle_survives_requests_and_expires(client, owner):

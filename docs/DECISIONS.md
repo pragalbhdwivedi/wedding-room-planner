@@ -34,6 +34,11 @@ Dates use Asia/Kolkata. The baseline was reconciled on 19 October 2026. "Confirm
 | D28 | 2026-10-19 | Implemented foundation choice | Initial app binds to loopback for SSH-forwarded preview. Shared phone/reception access requires the later HTTPS ingress step. |
 | D29 | 2026-10-19 | Confirmed | Owner requested network exposure of the preview. Add explicit private-address LAN access, retaining authentication and private database/API services. Supersedes loopback-only access in D28; trusted HTTPS ingress remains separate work. |
 
+| D30 | 2026-10-19 | Confirmed implementation instruction | Owner completed setup and instructed implementation of guest entry, reservations, drag/drop assignment, automatic allocation, billing and the remaining core workflow. Existing owner account must be preserved. |
+| D31 | 2026-10-19 | Implemented technical choice | Shared pure validation, revision-locked transactions, expiring owner-bound previews, exact warning acknowledgements and append-only assignment/estimate history. No arbitrary executable rule language. |
+| D32 | 2026-10-19 | Implemented technical limit; business policy remains open | Initial allocator keeps families as units; larger groups require manual split review. Unknown ages and child arrangements beyond the known supported examples remain unresolved, not assumed safe. This does not set a newly confirmed hotel child ceiling. |
+| D33 | 2026-10-19 | Implemented least-disclosure choice | Family viewers see their own guests/placements/attendance without contacts/private notes/costs; reception sees operational contacts/attendance without private notes or costs. Owner alone changes any planning data. |
+
 ## Future decisions
 
 Append a dated decision for each owner policy change. Mark superseded decisions explicitly and update the canonical requirement and relevant acceptance checks in the same commit. Do not rewrite a proposed design as a confirmed owner decision merely because it appeared in an assistant explanation.

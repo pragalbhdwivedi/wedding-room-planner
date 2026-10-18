@@ -17,6 +17,11 @@ admin = create_engine(migration_url)
 def reset_identities():
     with admin.begin() as db:
         db.execute(text("TRUNCATE sessions, change_history, login_throttle, users CASCADE"))
+        db.execute(text("TRUNCATE families, guests, assignments, room_locks, guest_links, room_connections, planning_rules, hotel_charge_days, meal_attendance, guest_presence, function_events, event_attendance CASCADE"))
+        db.execute(text("UPDATE plan_state SET revision=1,cursor=NULL,redo='[]'::jsonb WHERE id=1"))
+        db.execute(text("UPDATE planning_resources SET reserved=false,near_restaurant=false"))
+        db.execute(text("UPDATE event_policy SET wyndham_allowance=128,wyndham_excess_paise=500000,staff_meal_paise=15000,second_hotel_day_paise=1800000,second_hotel_included=12 WHERE id=1"))
+        db.execute(text("UPDATE billing_settings SET guest_meals='{}'::jsonb,second_extra_paise=NULL WHERE id=1"))
 
 
 @pytest.fixture

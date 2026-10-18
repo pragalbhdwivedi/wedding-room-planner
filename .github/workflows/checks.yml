@@ -1,4 +1,4 @@
-name: Foundation checks
+name: Application checks
 on: [push, pull_request]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         run: sudo docker compose -f compose.test.yaml up -d --wait testdb
       - name: Apply migrations to isolated database
         run: sudo docker compose -f compose.test.yaml run --rm --no-deps migrate-test
-      - name: Verify authentication, permissions and inventory
+      - name: Verify authentication, planning, privacy, allocation and billing
         run: sudo docker compose -f compose.test.yaml run --rm --no-deps test
       - name: Remove isolated verification database
         if: always()

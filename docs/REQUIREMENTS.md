@@ -96,3 +96,9 @@ The owner requested a new public repository on their GitHub profile as the sourc
 Owner instruction on 19 October 2026: download a fresh Debian cloud image, create template 9002 on Nageshwar, retain template 9001's cloud-init login/access details where present, and create a new dedicated VM on that node's local-lvm sized for this application. Later clarification: normal VLAN 1 and an owner-supplied static /23 address for the new VM. Actual connection details belong only in private handover records. Original template and existing guests must be preserved. Docker-host preparation does not itself constitute application implementation/deployment or backup acceptance.
 
 Subsequent owner instruction: expose the preview on the local network so other LAN devices can open it without the owner's PC tunnel. Keep authentication and owner/viewer restrictions. LAN exposure does not authorize internet publishing or direct database exposure.
+
+## Implementation qualification — core planning release
+
+The supported child examples are retained; larger young-child arrangements remain unresolved under O02 rather than becoming an invented hotel policy. The first allocator uses whole-family units and bounded search. It may leave oversized families or unknown ages unassigned for manual review. Neither a solver proposal nor an estimate is applied/finalised automatically. Actual arrival/departure, function attendance and meal attendance are independent records. One person cannot be counted for the same meal at two locations on the same attendance basis.
+
+General Premium allocation is blocked until the owner chooses the four reserved Premium rooms. Exact physical restaurant/neighbour relationships remain owner-confirmed inputs. The six secondary room numbers are internal placeholders until privately supplied.

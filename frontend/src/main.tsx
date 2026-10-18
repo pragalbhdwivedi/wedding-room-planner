@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import "./style.css";
+import { PlanningWorkspace } from "./planning";
 
 type User = {
   id: string;
@@ -84,7 +85,7 @@ function App() {
     [setup, setSetup] = useState(false);
   const [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
-    [page, setPage] = useState("rooms"),
+    [page, setPage] = useState("planner"),
     [inventory, setInventory] = useState<Inventory | null>(null);
   const [hotel, setHotel] = useState("wyndham"),
     [floor, setFloor] = useState("all"),
@@ -208,7 +209,7 @@ function App() {
       setCsrf(d.csrf_token);
       setSetup(false);
       setNotice("");
-      setPage("rooms");
+      setPage("planner");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -421,7 +422,7 @@ function App() {
             </div>
           </form>
           <span className="auth-caption">
-            Wedding accommodation planner · Foundation preview
+            Wedding accommodation planner · Private workspace
           </span>
         </section>
       </main>
@@ -454,18 +455,50 @@ function App() {
         </div>
         <span className="nav-caption">THE WEDDING WORKSPACE</span>
         <nav aria-label="Main navigation">
-          <button
-            className={page === "rooms" ? "nav-item active" : "nav-item"}
-            onClick={() => {
-              setPage("rooms");
-              setNotice("");
-              setError("");
-            }}
-          >
-            <LayoutGrid size={18} />
-            Room overview
-            <ChevronRight size={15} />
-          </button>
+          {[
+            {
+              id: "planner",
+              label: "Room planner",
+              icon: <LayoutGrid size={18} />,
+            },
+            {
+              id: "guests",
+              label: "Guests & families",
+              icon: <UsersRound size={18} />,
+            },
+            {
+              id: "attendance",
+              label: "Arrivals & functions",
+              icon: <CalendarDays size={18} />,
+            },
+            ...(owner
+              ? [
+                  {
+                    id: "billing",
+                    label: "Attendance & billing",
+                    icon: <CalendarDays size={18} />,
+                  },
+                  {
+                    id: "rules",
+                    label: "Rooms & rules",
+                    icon: <ShieldCheck size={18} />,
+                  },
+                ]
+              : []),
+          ].map((item) => (
+            <button
+              key={item.id}
+              className={page === item.id ? "nav-item active" : "nav-item"}
+              onClick={() => {
+                setPage(item.id);
+                setNotice("");
+                setError("");
+              }}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
           {owner && (
             <button
               className={page === "users" ? "nav-item active" : "nav-item"}
@@ -481,9 +514,12 @@ function App() {
           )}
         </nav>
         <div className="coming-card">
-          <span className="tiny-label">COMING NEXT</span>
+          <span className="tiny-label">A THOUGHTFUL STAY</span>
           <b>People make the plan.</b>
-          <p>Guest entry and room assignments are the next stage.</p>
+          <p>
+            Keep families together. Review warnings. Make every guest feel
+            welcome.
+          </p>
         </div>
         <div className="sidebar-bottom">
           <span className="avatar">
@@ -507,7 +543,18 @@ function App() {
         <header className="topbar">
           <span className="breadcrumb">
             Wedding workspace <ChevronRight size={13} />
-            <b>{page === "users" ? "Users & access" : "Rooms"}</b>
+            <b>
+              {(
+                {
+                  planner: "Room planner",
+                  guests: "Guests & families",
+                  attendance: "Arrivals & functions",
+                  billing: "Attendance & billing",
+                  rules: "Rooms & rules",
+                  users: "Users & access",
+                } as Record<string, string>
+              )[page] || "Rooms"}
+            </b>
           </span>
           <span className="date-pill">
             <CalendarDays size={15} />
@@ -529,7 +576,20 @@ function App() {
               {notice}
             </div>
           )}
-          {page === "rooms" ? (
+          {["planner", "guests", "billing", "rules", "attendance"].includes(
+            page,
+          ) ? (
+            <PlanningWorkspace
+              user={user}
+              csrf={csrf}
+              page={page}
+              onExpired={() => {
+                setUser(null);
+                setCsrf("");
+                setInventory(null);
+              }}
+            />
+          ) : page === "rooms" ? (
             <>
               <div className="page-heading">
                 <div>

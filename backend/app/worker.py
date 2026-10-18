@@ -1,11 +1,7 @@
-"""Foundation worker: database heartbeat only; no allocation jobs are implemented."""
+"""Leased jobs; applying a proposal always requires the owner."""
 import signal
 import time
-
-from sqlalchemy.dialects.postgresql import insert
-
-from .db import SessionLocal
-from .models import WorkerHeartbeat, now
+from .jobs import process_one
 
 running = True
 
@@ -15,13 +11,14 @@ def stop(*_):
     running = False
 
 
-signal.signal(signal.SIGTERM, stop)
-signal.signal(signal.SIGINT, stop)
-while running:
-    with SessionLocal.begin() as db:
-        db.execute(insert(WorkerHeartbeat).values(id="foundation", seen_at=now()).on_conflict_do_update(
-            index_elements=[WorkerHeartbeat.id], set_={"seen_at": now()}))
-    for _ in range(10):
-        if not running:
-            break
-        time.sleep(1)
+def main():
+    signal.signal(signal.SIGTERM,stop);signal.signal(signal.SIGINT,stop)
+    while running:
+        try:process_one()
+        except Exception:pass  # Transient database failures retry; health becomes stale.
+        for _ in range(2):
+            if not running:break
+            time.sleep(1)
+
+
+if __name__=="__main__":main()

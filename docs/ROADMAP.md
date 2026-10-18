@@ -1,6 +1,6 @@
 # Delivery plan
 
-Status: phase 1 is implemented, technically verified and deployed as a private preview. Read-only structural inventory from phase 2 is included; reservations and editable topology remain pending. Real owner setup and acceptance are still pending. STATUS.md records actual check/deployment results. Subsequent implementation is reviewed against REQUIREMENTS.md and ACCEPTANCE.md.
+Status: phases 1–6 are implemented for technical verification. The owner has completed their login setup. Core planning deployment, exact-revision checks and browser evidence are tracked in STATUS.md; owner acceptance remains separate. Phase 7 is partial (LAN preview and persistent private database; trusted HTTPS and owner-deferred backups remain open).
 
 | Phase | Deliverables | Evidence before claiming completion |
 | --- | --- | --- |

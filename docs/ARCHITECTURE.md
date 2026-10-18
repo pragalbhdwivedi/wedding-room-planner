@@ -94,3 +94,11 @@ Owner-only imports parse into private staging, show columns/duplicates/unknown a
 - [OWASP password storage](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
 
 FET supplied inspiration for conditional constraints. This design proposes OR-Tools and independently written application rules; it does not embed FET code.
+
+## Implemented planning design (schema 0002)
+
+The earlier logical model is a design map. The deployed implementation uses `plan_state` for the transaction revision/history cursor; `families` and stable `guests` slots; `planning_resources` for room/bed flags and schematic positions; and `assignments` keyed by guest plus one of the two event nights. This fixed event does not implement arbitrary date-range stays. `room_locks`, `guest_links`, verified `room_connections`, and typed `planning_rules` feed the same validator used for manual previews, imports, history and solver application.
+
+`pending_changes` hold short-lived owner/revision-bound import or assignment previews. `plan_changes` and `bill_snapshots` are append-only to the runtime role. `allocation_runs` holds the private snapshot, lease/attempt state and reviewable result. `meal_attendance`, `guest_presence`, `function_events` and `event_attendance` distinguish planned meals/functions from actual attendance and actual arrival timestamps. `billing_settings` and explicit `hotel_charge_days` hold missing/provisional price inputs alongside the foundation `event_policy`. Source does not contain real runtime records.
+
+The allocator uses CP-SAT in the separate worker, with whole-family units, hard domain/capacity/compatibility/lock constraints, and bounded preference scoring. Every returned proposal is validated again by the shared rules and accepted through the same revision-safe preview/apply path. SSE emits only a revision and session-expiry signal; entity data is fetched again through scoped endpoints. This release does not implement a transactional event outbox or arbitrary FET rule execution.
