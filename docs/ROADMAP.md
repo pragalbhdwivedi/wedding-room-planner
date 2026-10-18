@@ -1,6 +1,6 @@
 # Delivery plan
 
-Status: phase 1 is implemented and undergoing verification. Read-only structural inventory from phase 2 is included; reservations and editable topology remain pending. STATUS.md records actual check/deployment results separately from owner acceptance. Subsequent implementation is reviewed against REQUIREMENTS.md and ACCEPTANCE.md.
+Status: phase 1 is implemented, technically verified and deployed as a private preview. Read-only structural inventory from phase 2 is included; reservations and editable topology remain pending. Real owner setup and acceptance are still pending. STATUS.md records actual check/deployment results. Subsequent implementation is reviewed against REQUIREMENTS.md and ACCEPTANCE.md.
 
 | Phase | Deliverables | Evidence before claiming completion |
 | --- | --- | --- |

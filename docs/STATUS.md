@@ -4,26 +4,29 @@ Updated 19 October 2026, Asia/Kolkata.
 
 | Area | State | Evidence / limit |
 | --- | --- | --- |
-| Requirements and decisions | Recorded | Latest owner rules and backup deferral are documented |
-| Dedicated Docker host | Prepared and checked | See INFRASTRUCTURE.md; this is separate from application evidence |
-| Docker application | Implemented; verification pending | Web/API/worker/database, one-off migration, pinned images and dependency locks |
-| Authentication and access | Implemented; verification pending | Protected single-owner bootstrap, password sessions, CSRF, throttling, owner-only viewer management |
-| Structural inventory | Implemented; verification pending | 44 Wyndham rooms, six second-hotel placeholders, 12 separate staff beds |
-| Family reservations | Partially represented | Four-room holdback shown; actual Premium room selection and allocation blocking are not implemented |
-| UI | Implemented; browser verification pending | Login/setup, room inventory/filter/details, users/access, responsive styles |
+| Requirements and decisions | Recorded | Latest owner rules and backup deferral documented |
+| Dedicated Docker host | Prepared and checked | INFRASTRUCTURE.md; private local/Proxmox handovers match |
+| Docker application | Built and running as a private preview | Web/API/heartbeat worker/PostgreSQL healthy; one-off migration completed |
+| Authentication and access | Implemented and synthetically verified | Protected single-owner setup, Argon2id passwords, hashed sessions, CSRF, throttling and owner-only viewer administration |
+| Structural inventory | Implemented and verified | 44 Wyndham rooms (20 Superior/24 Premium), six second-hotel placeholders, 12 separate staff beds |
+| Family reservations | Partially represented | Four-room holdback shown; actual Premium-room selection and allocation blocking remain next-stage work |
+| UI | Implemented and browser checked | Setup/login, inventory/filter/details, users/access; laptop and phone viewport checks |
 | Guest entry, topology editing, assignment | Planned | No guest entry, drag/drop, locks, swaps, undo or solver yet |
-| Attendance and cost calculation | Planned | Owner sees policy baseline only; no bill or attendance calculation |
+| Attendance and cost calculation | Planned | Owner sees rate baseline only; no bill or attendance calculation |
 | Import/export and live views | Planned | No integration evidence |
 | Worker | Heartbeat only | Not a solver or job-processing implementation |
-| Automated verification | Pending execution | Isolated PostgreSQL integration checks and Docker CI added |
-| Application deployment | Pending | Initial scope is an SSH-forwarded loopback preview; shared HTTPS ingress is not configured |
-| Backups / restore | Owner-deferred | No backup schedule or recovery test claimed |
-| Owner acceptance | Pending | Technical verification does not constitute acceptance |
+| Automated verification | Passed for foundation code | 16 PostgreSQL integration checks on dedicated VM; GitHub Docker checks passed; see verification receipt |
+| Persistence | Verified within foundation scope | Controlled marker and inventory survived database-container replacement |
+| Shared access / HTTPS | Pending | Initial web access is loopback through SSH forwarding; phone/reception network rollout is not configured |
+| Backups / restore | Owner-deferred | No scheduled backup or recovery test claimed |
+| Real owner setup / acceptance | Pending | Owner chooses credentials privately; no real user or guest records entered during verification |
 
 ## Foundation verification record
 
-Results will be added after the application build, migration, integration checks and browser review. Tests use a separate temporary PostgreSQL instance and synthetic users. The real owner account must remain unconfigured until the owner chooses credentials privately.
+Application code and deployed image tags: `0f826038da2248c4044dc2178bc743f77e68fafb`. This status update changes documentation only. See [the verification receipt](verification/FOUNDATION.md) for exact revisions, image IDs, checks and limits.
+
+The initial test-container import-path failure was fixed, then the application was verified. A phone access-table overflow found during browser review was corrected and rechecked. Tests and browser fixtures used a separate temporary PostgreSQL instance with synthetic accounts. That test environment was removed after review. The real database still requires owner setup.
 
 ## Next stages
 
-After the foundation: owner-selected family reservations and topology, private guest/family entry, shared assignment rules and manual moves, automatic proposals, dated attendance/costs, Excel import/export and live scoped views. Confirm unresolved physical/cost policies before implementing affected behavior; see OPEN_ITEMS.md.
+Owner-selected family reservations and topology, private guest/family entry, shared assignment rules and manual moves, automatic proposals, dated attendance/costs, Excel import/export and live scoped views. Confirm unresolved physical/cost policies before implementing affected behavior; see OPEN_ITEMS.md.
