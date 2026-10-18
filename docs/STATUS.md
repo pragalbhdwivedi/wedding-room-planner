@@ -15,15 +15,15 @@ Updated 19 October 2026, Asia/Kolkata.
 | Attendance and cost calculation | Planned | Owner sees rate baseline only; no bill or attendance calculation |
 | Import/export and live views | Planned | No integration evidence |
 | Worker | Heartbeat only | Not a solver or job-processing implementation |
-| Automated verification | Passed for foundation code | 16 PostgreSQL integration checks on dedicated VM; GitHub Docker checks passed; see verification receipt |
+| Automated verification | Passed for current code | 17 PostgreSQL integration checks on dedicated VM and GitHub Docker checks; original foundation receipt retained |
 | Persistence | Verified within foundation scope | Controlled marker and inventory survived database-container replacement |
-| LAN preview / HTTPS | LAN implementation under verification | Explicit private-address binding and LAN origin policy added under D29; trusted HTTPS remains pending |
+| LAN preview / HTTPS | LAN preview running and checked | Direct page/health access from owner's PC; authentication retained; trusted HTTPS remains pending |
 | Backups / restore | Owner-deferred | No scheduled backup or recovery test claimed |
 | Real owner setup / acceptance | Pending | Owner chooses credentials privately; no real user or guest records entered during verification |
 
 ## Foundation verification record
 
-Application code and deployed image tags: `0f826038da2248c4044dc2178bc743f77e68fafb`. This status update changes documentation only. See [the verification receipt](verification/FOUNDATION.md) for exact revisions, image IDs, checks and limits.
+Current application code and deployed image tags: `7fee89fde677d594b2183c3e2cf6ec657467bf77`. See [LAN verification](verification/LAN.md) for the current deployment and [the original foundation receipt](verification/FOUNDATION.md) for earlier image/persistence/browser evidence. Follow-up status changes are documentation only.
 
 The initial test-container import-path failure was fixed, then the application was verified. A phone access-table overflow found during browser review was corrected and rechecked. Tests and browser fixtures used a separate temporary PostgreSQL instance with synthetic accounts. That test environment was removed after review. The real database still requires owner setup.
 
