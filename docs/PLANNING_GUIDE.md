@@ -20,6 +20,8 @@ The planner opens on all 44 Wyndham rooms in a scrollable grid. Switch to Topolo
 
 Select a family/person then tap a room, or drag them to a card. Green outlines identify eligible destinations; a blocked destination explains its conflict. Review the exact guest/night/from/to list before applying. Warnings need individual confirmation; mandatory capacity, staff separation, reservation and access rules cannot be overridden.
 
+To place only some members together, choose **Choose people** on the target room card (or open its details and choose people there). Tick any combination of individuals, including only two from a family of four, then select **Review placement**. The review shows exactly who will move for the selected night. People already in that room stay; unticked family members remain where they are. A split-family warning needs its own confirmation. This action places people for one night and does not permanently link them; use **Rooms & rules → Guest relationships** for a lasting sharing rule.
+
 Room details provide per-night locks, unassignment and room swaps. **Undo/redo** applies to assignment changes, not every kind of edit. Locks and current rules are checked again when undoing. Split-family warnings can require confirmation during history actions too.
 
 The right panel distinguishes actual heads, Wyndham's 44 rooms, the six secondary rooms, staff beds, side usage, extra bedding and the estimate. Family viewers do not receive other-side room usage. Included bedding has no extra hotel charge.

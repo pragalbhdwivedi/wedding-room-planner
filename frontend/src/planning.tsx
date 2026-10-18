@@ -267,6 +267,7 @@ type RoomData = {
   topology?: boolean;
   choose: (r: Resource) => void;
   info: (r: Resource) => void;
+  pick: (r: Resource) => void;
 };
 function RoomNode({ data }: { data: RoomData }) {
   const r = data.resource,
@@ -335,6 +336,19 @@ function RoomNode({ data }: { data: RoomData }) {
           </button>
         </span>
       </div>
+      {data.owner && !data.topology && (
+        <button
+          type="button"
+          className="room-pick-button"
+          aria-label={`Choose people for ${roomName(r)}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            data.pick(r);
+          }}
+        >
+          Choose people
+        </button>
+      )}
       <div className="room-meta">
         {r.category === "pending" ? "Category pending" : r.category} ·{" "}
         {r.floor === null
@@ -399,6 +413,9 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
     [layoutMode, setLayoutMode] = useState(false),
     [swapFrom, setSwapFrom] = useState<Resource | null>(null);
   const [details, setDetails] = useState<Resource | null>(null),
+    [pickerRoom, setPickerRoom] = useState<Resource | null>(null),
+    [pickerSelection, setPickerSelection] = useState<string[]>([]),
+    [pickerSearch, setPickerSearch] = useState(""),
     [familyDraft, setFamilyDraft] = useState<any>(null),
     [reserveDraft, setReserveDraft] = useState<string[] | null>(null),
     [preview, setPreview] = useState<Preview | null>(null),
@@ -630,7 +647,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
     setAcks([]);
   }
   async function move(ids: string[], destination: string | null) {
-    if (!data || !owner || !ids.length) return;
+    if (!data || !owner || !ids.length) return null;
     const result = await action("/assignments/preview", {
       revision: data.revision,
       moves: ids.map((id) => ({
@@ -640,6 +657,16 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
       })),
     });
     if (result) openPreview(result);
+    return result;
+  }
+  function openRoomPicker(r: Resource) {
+    if (!owner) return;
+    setDetails(null);
+    setSelection([]);
+    setSwapFrom(null);
+    setPickerSelection([]);
+    setPickerSearch("");
+    setPickerRoom(r);
   }
   async function chooseRoom(r: Resource) {
     if (Date.now() - dragFinished.current < 250) return;
@@ -718,6 +745,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
           owner,
           choose: chooseRoom,
           info: setDetails,
+          pick: openRoomPicker,
         },
       })),
     );
@@ -755,6 +783,18 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
     [];
   const selectedGuests =
     data?.guests.filter((g) => selection.includes(g.id)) || [];
+  const pickerCandidates = pickerRoom && data
+    ? data.guests.filter(
+        (g) =>
+          occupied(g, night) &&
+          !data.assignments.some(
+            (a) =>
+              a.guest_id === g.id &&
+              a.night === night &&
+              a.resource_id === pickerRoom.id,
+          ),
+      )
+    : [];
   function selectGuests(ids: string[]) {
     setSelection(ids);
     setSwapFrom(null);
@@ -1567,6 +1607,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                 onChange={(e) => {
                   setNight(e.target.value);
                   setSelection([]);
+                  setPickerRoom(null);
                 }}
               >
                 {nights.map((n) => (
@@ -3138,6 +3179,13 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
             <>
               <div className="dialog-actions">
                 <button
+                  type="button"
+                  className="primary compact"
+                  onClick={() => openRoomPicker(details)}
+                >
+                  Choose people for this room
+                </button>
+                <button
                   className="secondary compact"
                   onClick={async () => {
                     await action(
@@ -3232,6 +3280,99 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
               </form>
             </>
           )}
+          {error && <div className="alert error">{error}</div>}
+        </Dialog>
+      )}
+      {pickerRoom && owner && (
+        <Dialog
+          title={`Choose people for ${roomName(pickerRoom)}`}
+          close={() => setPickerRoom(null)}
+        >
+          <p className="form-help">
+            Select any number of people for {dayName(night)}. You can choose only
+            some members of a family. People already in this room stay here;
+            selected people are added or moved after review.
+          </p>
+          <label className="room-picker-search">
+            Find a family or person
+            <input
+              type="search"
+              value={pickerSearch}
+              onChange={(e) => setPickerSearch(e.target.value)}
+              placeholder="Search names"
+            />
+          </label>
+          <div className="room-picker-list">
+            {data.families.map((f) => {
+              const members = pickerCandidates.filter((g) => g.family_id === f.id);
+              if (!members.length) return null;
+              const query = pickerSearch.trim().toLocaleLowerCase();
+              if (
+                query &&
+                !f.label.toLocaleLowerCase().includes(query) &&
+                !members.some((g) => guestName(g).toLocaleLowerCase().includes(query))
+              ) return null;
+              const chosen = members.filter((g) => pickerSelection.includes(g.id)).length;
+              return (
+                <section className="room-picker-family" key={f.id}>
+                  <div className="room-picker-family-heading">
+                    <b>{f.label}</b>
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() => setPickerSelection((current) =>
+                        chosen === members.length
+                          ? current.filter((id) => !members.some((g) => g.id === id))
+                          : [...new Set([...current, ...members.map((g) => g.id)])],
+                      )}
+                    >
+                      {chosen === members.length ? "Clear family" : `Select all ${members.length}`}
+                    </button>
+                  </div>
+                  {members.map((g) => {
+                    const assigned = data.assignments.find(
+                      (a) => a.guest_id === g.id && a.night === night,
+                    );
+                    const currentRoom = assigned && data.resources.find((r) => r.id === assigned.resource_id);
+                    return (
+                      <label className="room-picker-person" key={g.id}>
+                        <input
+                          type="checkbox"
+                          checked={pickerSelection.includes(g.id)}
+                          onChange={(e) => setPickerSelection((current) =>
+                            e.target.checked
+                              ? [...current, g.id]
+                              : current.filter((id) => id !== g.id),
+                          )}
+                        />
+                        <span>
+                          <b>{guestName(g)}</b>
+                          <small>{currentRoom ? `Currently in ${roomName(currentRoom)}` : "Unassigned"}</small>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </section>
+              );
+            })}
+            {!pickerCandidates.length && (
+              <p className="form-help">No other people stay on this night.</p>
+            )}
+          </div>
+          <div className="dialog-actions">
+            <span>{pickerSelection.length} selected</span>
+            <button
+              type="button"
+              className="primary compact"
+              disabled={busy || !pickerSelection.length}
+              onClick={async () => {
+                const result = await move(pickerSelection, pickerRoom.id);
+                if (result) setPickerRoom(null);
+              }}
+            >
+              Review placement
+            </button>
+          </div>
           {error && <div className="alert error">{error}</div>}
         </Dialog>
       )}

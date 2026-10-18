@@ -69,6 +69,7 @@ Build a private web-based room-allocation application inside Docker. Support pho
 
 - Automatically suggest assignments initially, then allow the owner to rearrange them.
 - Drag individuals or whole families; support swapping rooms, moving occupants together, undo/redo, and highlighting compatible destinations.
+- From a selected room, let the owner tick any subset of resident people, including one, two, three or all four members of a family, and review their one-night placement together. Existing room occupants remain unless explicitly moved. This manual room selection does not create a permanent must-share relationship.
 - Allow room/placement locks. Automatic assignment must preserve locks and family-room reservations.
 - When a social/preference rule would be violated, show the warning and obtain explicit owner confirmation before an allowed override. Record the exception.
 - Mandatory dormitory separation, ownership permissions, and data-integrity restrictions are not bypassed by clicking a generic override.

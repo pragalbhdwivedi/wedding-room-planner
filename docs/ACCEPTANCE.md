@@ -24,6 +24,7 @@ Status: acceptance plan; actual results are recorded separately in STATUS.md. Us
 | A15 | Reception-only guest, no stay | Counts toward selected attendance, not overnight resident occupancy. Missing meal rate stays unpriced. |
 | A16 | Lock a room/placement, run solver | Existing locked arrangement remains intact; impossible results report why. |
 | A17 | Unrelated adults / family split | Explicit compatibility required; split warning shown; permitted owner override applies only to the exact reviewed change and is audited. |
+| A17a | Pick two of four family members from a room | Room card and room details offer a people picker. The owner ticks any subset, sees existing placements, and reviews exactly those people on the selected night. The two unselected members stay where they were; a new family-split warning requires explicit acknowledgement. Room occupants already there remain. Mandatory capacity, lock, sharing and staff rules still block invalid placement. |
 | A18 | Same guest assigned to overlapping stays | Rejected. Multiple compatible guests sharing one room remain allowed within rules. |
 | A19 | Move/swap fails mid-transaction | No half-move, lost occupant, or mismatched summary/history. |
 | A20 | Owner tabs A and B edit stale data | Stale write rejected with current-state recovery; no silent overwrite. Old solver proposals cannot overwrite newer locks/data. |
