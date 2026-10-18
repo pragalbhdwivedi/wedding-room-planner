@@ -149,8 +149,8 @@ const dayName = (s: string) =>
   });
 const roomName = (r: Resource) =>
   r.number || `Unnumbered · ${r.id.replace("second-", "")}`;
-const guestName = (g: Guest) =>
-  g.name ||
+const guestName = (g?: Guest) =>
+  !g ? "Guest no longer listed" : g.name ||
   `${g.group_label || "Unnamed guest"} · ${g.age_band === "adult" ? "Adult" : g.age_band === "child" ? "Child" : "Guest"} ${g.tags.find((t) => t.startsWith("slot_"))?.slice(5) || g.id.slice(0, 4)}`;
 const occupied = (g: Guest, n: string) => !!g.arrival && g.arrival <= n;
 const emptyMember = () => ({
@@ -1746,8 +1746,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                   <summary>See who remains unassigned</summary>
                   {currentJob.result.unassigned.map((u: any) => (
                     <p key={u.guest_id + u.night}>
-                      {data.guests.find((g) => g.id === u.guest_id)?.name ||
-                        "Unnamed guest"}{" "}
+                      {guestName(data.guests.find((g) => g.id === u.guest_id))}{" "}
                       · {dayName(u.night)}: {u.reasons.join(" ")}
                     </p>
                   ))}
@@ -2912,8 +2911,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                   {preview.changes.map((c) => (
                     <tr key={c.guest_id + c.night}>
                       <td>
-                        {data.guests.find((g) => g.id === c.guest_id)?.name ||
-                          "Unnamed guest"}
+                        {guestName(data.guests.find((g) => g.id === c.guest_id))}
                       </td>
                       <td>{dayName(c.night)}</td>
                       <td>
@@ -2962,8 +2960,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                     {w.guest_ids
                       .map(
                         (id) =>
-                          data.guests.find((g) => g.id === id)?.name ||
-                          "Unnamed guest",
+                          guestName(data.guests.find((g) => g.id === id)),
                       )
                       .join(", ")}
                   </small>
