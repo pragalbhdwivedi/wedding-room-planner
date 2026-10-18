@@ -9,7 +9,7 @@ Invitation context is stored in a private directory separate from overnight gues
 ## Candidate checks
 
 - Dedicated Debian Docker host; separate tmpfs test PostgreSQL and synthetic accounts only.
-- 42 isolated checks passed, including additive migrations, existing permissions, count-based billing/assignment, four-room cross-night pool, applied-worker status, directory scoping, no guest creation by directory entries, unsafe-source rejection and midnight function export.
+- The initial 42 isolated checks passed, including additive migrations, existing permissions, count-based billing/assignment, four-room cross-night pool, applied-worker status, directory scoping, no guest creation by directory entries, unsafe-source rejection and midnight function export.
 - TypeScript/Vite build completed inside Docker. Browser checks use a separate temporary preview, never real owner credentials or fixtures in the live database.
 - Browser verification and final committed-source CI/deployment binding are recorded in STATUS.md after release.
 - Real imports, names, ages, assignments, screenshots and source attachments remain outside public Git. Missing ages, arrival choices, blank source headcounts, physical adjacency and unsettled hotel pricing are not resolved by passing tests.
@@ -23,3 +23,10 @@ Valid XLSX files may omit cached worksheet dimensions. Guest import now streams 
 ## Unnamed guest review labels
 
 Unnamed people retain their stable slots. Assignment review, warnings and unresolved diagnostics now use the same family label plus adult/child slot identifier as the room cards. A missing referenced guest is explicitly labelled as no longer listed. This changes display only; it does not rename people, allocate additional rooms or alter saved guest data. Browser verification checks a private owner preview without applying a second placement.
+
+
+## Final binding
+
+Application head `9ad7ff918897255761c76d5e0340b91f36713749`, merged through PR #7, passed [Actions run 39171557577](https://github.com/pragalbhdwivedi/wedding-room-planner/actions/runs/39171557577): all 43 checks plus Docker builds and clean additive migrations. The same head was built from a Git archive and deployed on the dedicated Debian Docker host, verified at 2026-10-18 22:19:44 UTC. Schema 0004; web/API/worker/database healthy; original account/session/secret/volume preservation and unauthenticated restrictions verified.
+
+Final owner-preview verification showed a meaningful family/adult-slot label in an assignment-review row, then closed the preview without applying a second move. The live service retained the saved room plan and invitation context. Isolated preview resources were removed. Full receipts and real data remain private; STATUS.md distinguishes the prior release and remaining owner/hotel confirmations.
