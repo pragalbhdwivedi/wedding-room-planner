@@ -59,7 +59,7 @@ def repair_placements(before,data,fid):
         options[n]=[c[-1] for c in sorted(candidates)]
     # Prefer one room for the whole stay, then try a bounded set of dated choices.
     common=set.intersection(*(set(options[n]) for n in nights)) if nights else set()
-    attempts=[{n:rid for n in nights} for rid in sorted(common)]
+    attempts=[{n:rid for n in nights} for rid in options[nights[0]] if rid in common] if nights else []
     attempts += [dict(zip(nights,p)) for p in islice(product(*(options[n][:12] for n in nights)),144)]
     attempts.append({n:None for n in nights})
     for choice in attempts:

@@ -154,6 +154,8 @@ def update_family(family_id:uuid.UUID,body:FamilyInput,user:Owner,db:DB):
         after,reason=base,'No safe room placement is available for the added guest. Review saving them unassigned.'
     if not checked['errors'] and after is not None and len(after)<len(base):
         after,reason=base,'The new member cannot be placed with the existing family safely. Review saving them unassigned.'
+    if placed_family and not checked['errors'] and after!=base and after is not None:
+        reason='Review the proposed room placement for the added member before saving.'
     if after is None:raise HTTPException(409,{'message':reason,'errors':checked['errors']})
     if checked['errors']:reason=' '.join(dict.fromkeys(e['message'] for e in checked['errors']))+' '+reason
     result=validate(data,after,before=before['assignments'])

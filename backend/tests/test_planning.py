@@ -574,6 +574,7 @@ def test_adding_member_to_placed_family_is_reviewed_and_saved(client,owner):
     assert applied.status_code==200,applied.text
     data=plan(client);assert len(data['guests'])==2 and len(data['assignments'])==4
     assert next(g for g in data['guests'] if g['name']=='Synthetic New')['age_band']=='adult'
+    assert {a['resource_id'] for a in data['assignments']}=={'w-102'}
     assert not data['conflicts']['errors']
 
 
