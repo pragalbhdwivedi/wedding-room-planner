@@ -43,6 +43,9 @@ Dates use Asia/Kolkata. The baseline was reconciled on 19 October 2026. "Confirm
 | D35 | 2026-10-19 | Confirmed | Until four Premium family-room numbers are selected, preserve an unnamed four-room reserve pool unused across both nights. Supersedes D32's exact-age prerequisite and the initial exact-reservation prerequisite. |
 | D36 | 2026-10-19 | Confirmed | Show all Wyndham rooms initially; retain block/floor filters and editable topology. |
 | D37 | 2026-10-19 | Confirmed | Add invitation function/family context privately and use its visual theme. Directory people do not automatically add accommodation headcounts; RSVP integration remains separate. |
+| D38 | 2026-10-19 | Confirmed | Give each guest tickable tags and a male/female selection; keep unspecified until the owner chooses. |
+| D39 | 2026-10-19 | Confirmed | Automatically combine Friends with the same selected gender only within their own bride/groom side. Keep couples and linked children together. |
+| D40 | 2026-10-19 | Implementation choice | An edit that newly requires ground floor is reviewed with a valid room move before the guest detail and assignment are saved together. The mandatory age-50 rule and locks remain enforced. |
 
 ## Future decisions
 

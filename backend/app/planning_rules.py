@@ -15,6 +15,18 @@ def age_band(guest):
 def is_adult(guest):return age_band(guest)=="adult"
 
 
+def is_friend(guest):
+    return guest.get('sharing_mode')=='friends' and guest['category']=='guest' and is_adult(guest) and not guest.get('couple_children',False)
+
+
+def friend_rosters(data):
+    return {f['id'] for f in data['families'] if (people:=[g for g in data['guests'] if g['family_id']==f['id'] and g['category']=='guest']) and all(is_friend(g) for g in people)}
+
+
+def friend_pair(a,b):
+    return a.get('gender','unspecified') in {'male','female'} and a.get('gender')==b.get('gender') and a['side']==b['side']
+
+
 def active(guest, night):
     return guest.get("arrival") in NIGHTS and guest["arrival"] <= night <= NIGHTS[-1]
 
@@ -73,6 +85,7 @@ def compatible(a, b, links):
     pair = {a["id"], b["id"]}
     relevant = [l for l in links if {l["a"],l["b"]} == pair]
     if any(l["kind"] == "cannot_share" and l["severity"] == "hard" for l in relevant):return False
+    if is_friend(a) and is_friend(b):return friend_pair(a,b)
     return a["family_id"] == b["family_id"] or any(l["kind"] in {"may_share", "must_share"} for l in relevant)
 
 
@@ -108,12 +121,14 @@ def validate(snapshot, assignments, *, before=None):
         r=resources[rid];gids=[g["id"] for g in people]
         if not capacity_ok(people,r):result.append(issue("capacity", "Adult capacity or the confirmed child-sharing arrangement is exceeded/unresolved.", guests=gids, resources=[rid],night=night))
         for a,b in combinations(people,2):
-            if not compatible(a,b,links):result.append(issue("compatibility", "Unrelated guests require explicit sharing compatibility; mandatory exclusions cannot be overridden.", guests=[a["id"],b["id"]], resources=[rid],night=night))
+            if not compatible(a,b,links):result.append(issue("compatibility", "Friends share only with the same specified gender and side. Other unrelated guests need explicit sharing compatibility; mandatory exclusions remain enforced.", guests=[a["id"],b["id"]], resources=[rid],night=night))
     if snapshot["reserved_count"]==0:
         premium={a['resource_id'] for a in assignments if a['resource_id'] in resources and resources[a['resource_id']]['hotel_id']=='wyndham' and resources[a['resource_id']]['category']=='premium'}
         if len(premium)>20:result.append(issue('reserve_pool','Four Premium rooms must stay unused across both nights until named family rooms are chosen.',resources=premium))
+    rosters=friend_rosters(snapshot)
     for night in NIGHTS:
         for family in snapshot["families"]:
+            if family["id"] in rosters:continue
             people=[g for g in guests.values() if g["family_id"]==family["id"] and g["category"]=="guest" and active(g,night)]
             places={by_guest.get((g["id"],night)) for g in people}
             if len(places)>1 and places!={None}:

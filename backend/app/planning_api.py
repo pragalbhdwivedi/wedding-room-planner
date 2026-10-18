@@ -11,6 +11,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validato
 from sqlalchemy import delete, select
 
 from .billing import calculate
+from .family_edits import changed_rows, project_edit, repair_placements
 from .db import SessionLocal, database
 from .models import (AllocationRun, Audit, BillSnapshot, BillingSettings, EventAttendance, EventPolicy, Family, FunctionEvent, Guest, GuestLink, GuestPresence,
                      HotelChargeDay, LoginSession, MealAttendance, PendingChange, PlanChange, PlanState,
@@ -34,11 +35,18 @@ class Revision(Input):
     revision:int=Field(ge=1)
 
 
+class ApplyInput(Revision):
+    token:uuid.UUID
+    acknowledged:list[str]=Field(default_factory=list,max_length=2000)
+
+
 class GuestInput(Input):
     id:uuid.UUID|None=None
     name:str|None=Field(default=None,max_length=100)
     age:int|None=Field(default=None,ge=0,le=120)
     age_band:Literal["adult","child","unknown"]="unknown"
+    gender:Literal["unspecified","male","female"]="unspecified"
+    sharing_mode:Literal["family","friends"]="family"
     category:Literal["guest","driver","staff","vendor"]="guest"
     phone:str|None=Field(default=None,max_length=40)
     arrival:Literal["2026-11-24","2026-11-25"]|None="2026-11-24"
@@ -123,13 +131,57 @@ def _members(db,family,members,creating=False):
 @router.put("/families/{family_id}",dependencies=WRITE)
 def update_family(family_id:uuid.UUID,body:FamilyInput,user:Owner,db:DB):
     state=locked_state(db,body.revision);before=snapshot(db)
-    family=db.get(Family,family_id)
-    if not family:raise HTTPException(404,"Family/group not found")
-    count=len(before["guests"])-sum(g["family_id"]==str(family_id) for g in before["guests"])+len(body.members)
-    if count>1000:raise HTTPException(400,"The current event supports up to 1,000 guest slots.")
-    family.label,family.side,family.reserved_eligible,family.couple_children=body.label,body.side,body.reserved_eligible,body.couple_children
-    _members(db,family,body.members);verify_edit(db,before)
-    return record(db,user,state,"family.updated",{"family_id":str(family_id),"slots":len(body.members)})
+    if not db.get(Family,family_id):raise HTTPException(404,"Family/group not found")
+    draft=body.model_dump(mode='json');existing={g['id']:g for g in before['guests']}
+    for source,member in zip(body.members,draft['members']):
+        old=existing.get(str(source.id))
+        if old:
+            for key in ['gender','sharing_mode']:
+                if key not in source.model_fields_set:member[key]=old[key]
+    try:data,payload=project_edit(before,str(family_id),draft)
+    except ValueError as error:raise HTTPException(400,str(error))
+    checked=validate(data,before['assignments'],before=before['assignments'])
+    old={w['id'] for w in validate(before,before['assignments'])['warnings']}
+    if not checked['errors'] and not [w for w in checked['warnings'] if w['id'] not in old]:
+        persist_family_edit(db,payload)
+        return record(db,user,state,'family.updated',{'family_id':str(family_id),'slots':len(body.members)})
+    after,reason=(repair_placements(before,data,str(family_id)) if checked['errors'] else (before['assignments'],'Review the new placement warnings before saving these details.'))
+    if after is None:raise HTTPException(409,{'message':reason,'errors':checked['errors']})
+    if checked['errors']:reason=' '.join(dict.fromkeys(e['message'] for e in checked['errors']))+' '+reason
+    result=validate(data,after,before=before['assignments'])
+    warnings=[w for w in result['warnings'] if w['id'] not in old]
+    pending=PendingChange(owner_id=user.id,revision=body.revision,kind='family_edit',payload={**payload,'after':after},warnings=warnings,expires_at=now()+timedelta(minutes=5))
+    db.add(pending);db.commit()
+    from .planning_rules import summaries
+    return {'family_edit':True,'token':str(pending.id),'revision':body.revision,'errors':[],'warnings':warnings,'summary':summaries(data,after),'changes':changed_rows(before['assignments'],after),'reason':reason,'edited_guests':[{'id':g['id'],'name':g['name'],'age':g['age'],'group_label':g['group_label'],'age_band':g['age_band'],'tags':g['tags']} for g in payload['guests']]}
+
+
+def persist_family_edit(db,payload):
+    f=payload['family'];family=db.get(Family,uuid.UUID(f['id']))
+    for key in ['label','side','reserved_eligible','couple_children']:setattr(family,key,f[key])
+    for g in payload['guests']:
+        row=db.get(Guest,uuid.UUID(g['id']))
+        if not row:row=Guest(id=uuid.UUID(g['id']),family_id=family.id);db.add(row)
+        for key in ['name','age','age_band','gender','sharing_mode','category','phone','tags','notes']:setattr(row,key,g[key])
+        row.arrival=date.fromisoformat(g['arrival']) if g['arrival'] else None
+    db.flush()
+
+
+@router.post('/families/apply',dependencies=WRITE)
+def apply_family_edit(body:ApplyInput,user:Owner,db:DB):
+    state=locked_state(db,body.revision);pending=db.get(PendingChange,body.token)
+    if not pending or pending.kind!='family_edit' or pending.owner_id!=user.id or pending.revision!=state.revision or pending.expires_at<=now():raise HTTPException(409,'This guest-edit preview changed or expired. Review the edit again.')
+    before=snapshot(db);old={w['id'] for w in validate(before,before['assignments'])['warnings']}
+    persist_family_edit(db,pending.payload);data=snapshot(db);after=pending.payload['after']
+    result=hard_check(data,after,before['assignments'])
+    expected={w['id'] for w in result['warnings'] if w['id'] not in old}
+    if expected!={w['id'] for w in pending.warnings} or set(body.acknowledged)!=expected:raise HTTPException(409,'Acknowledge exactly the warnings in this guest-edit preview.')
+    if after!=before['assignments']:
+        change=PlanChange(parent=state.cursor,actor_id=user.id,before=before['assignments'],after=after);db.add(change);db.flush();state.cursor=change.id;state.redo=[]
+        save_assignments(db,after)
+    fid=pending.payload['family']['id'];db.delete(pending)
+    return record(db,user,state,'family.updated_with_placement',{'family_id':fid,'warning_ids':sorted(expected),'placement_changes':len(changed_rows(before['assignments'],after))})
+
 
 
 class Reservations(Revision):room_ids:list[str]=Field(max_length=4)
@@ -350,9 +402,6 @@ def preview_moves(body:Moves,user:Owner,db:DB):
     return preview_plan(db,user,body.revision,after)
 
 
-class ApplyInput(Revision):
-    token:uuid.UUID
-    acknowledged:list[str]=Field(default_factory=list,max_length=2000)
 
 
 @router.post("/assignments/apply",dependencies=WRITE)

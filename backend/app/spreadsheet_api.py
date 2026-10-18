@@ -18,7 +18,7 @@ from .planning_rules import issue, validate
 from .planning_store import hard_check, locked_state, snapshot, visible_plan
 
 router=APIRouter(prefix="/api/planning")
-HEADERS=['Guest ID','Family ID','Group','Side','Reserved eligible','Couple with children','Name','Age','Category','Phone','Arrival','Tags','Private notes','Age band']
+HEADERS=['Guest ID','Family ID','Group','Side','Reserved eligible','Couple with children','Name','Age','Category','Phone','Arrival','Tags','Private notes','Age band','Gender','Sharing mode']
 
 
 def safe(value):
@@ -44,7 +44,7 @@ def export(user:Viewer,db:DB,template:bool=False):
     if not template:
         for g in data['guests']:
             f=families[g['family_id']]
-            row=dict(zip(HEADERS,[g['id'],g['family_id'],f['label'],g['side'],f['reserved_eligible'],f['couple_children'],g['name'],g['age'],g['category'],g.get('phone'),g['arrival'],', '.join(g['tags']),g.get('notes',''),g.get('age_band','unknown')]))
+            row=dict(zip(HEADERS,[g['id'],g['family_id'],f['label'],g['side'],f['reserved_eligible'],f['couple_children'],g['name'],g['age'],g['category'],g.get('phone'),g['arrival'],', '.join(g['tags']),g.get('notes',''),g.get('age_band','unknown'),g.get('gender','unspecified'),g.get('sharing_mode','family')]))
             sheet.append([safe(row[h]) for h in headers])
         assigned=workbook.create_sheet('Assignments');assigned.append(['Guest ID','Night','Room or bed ID'])
         for a in data['assignments']:assigned.append([a['guest_id'],a['night'],a['resource_id']])
@@ -126,7 +126,11 @@ def parse_import(content,current):
             name=row.get('Name')
             # Undo only the formula-protection prefix produced by our exporter.
             if isinstance(name,str) and name.startswith(("'=","'+","'-","'@")):name=name[1:]
-            value=GuestInput(name=name,age_band=str(row.get('Age band') or (old or {}).get('age_band','unknown')).strip().lower(),age=None if age in [None,''] else int(float(age)),category=str(row.get('Category') or 'guest').strip().lower(),phone=str(row['Phone']) if row.get('Phone') is not None else None,arrival=arrival,tags=[t.strip() for t in str(row.get('Tags') or '').split(',') if t.strip()],notes=str(row.get('Private notes') or ''))
+            tags=[t.strip() for t in str(row.get('Tags') or '').split(',') if t.strip()]
+            category=str(row.get('Category') or 'guest').strip().lower()
+            friend_hint=category=='friends' or bool(set(tags)&{'friends','role_friend'})
+            sharing_mode=str(row.get('Sharing mode') or ('friends' if friend_hint else (old or {}).get('sharing_mode','family'))).strip().lower()
+            value=GuestInput(name=name,gender=str(row.get('Gender') or (old or {}).get('gender','unspecified')).strip().lower(),sharing_mode=sharing_mode,age_band=str(row.get('Age band') or (old or {}).get('age_band','unknown')).strip().lower(),age=None if age in [None,''] else int(float(age)),category='guest' if category=='friends' else category,phone=str(row['Phone']) if row.get('Phone') is not None else None,arrival=arrival,tags=tags,notes=str(row.get('Private notes') or ''))
             guest={**value.model_dump(mode='json',exclude={'id'}),'id':gid,'family_id':fid,'side':side,'reserved_eligible':family['reserved_eligible'],'couple_children':family['couple_children']}
             if guest['name'] and guest['name'].casefold() in names and not old:warnings.append(issue('import_duplicate_name_'+str(row_index),'A new row has a name already present. Review duplicates before adding another slot.',severity='warning',guests=[gid]))
             if guest['name']:names.add(guest['name'].casefold())
@@ -172,7 +176,7 @@ def apply_import(body:ApplyInput,user:Owner,db:DB):
     for g in pending.payload['guests']:
         row=db.get(Guest,uuid.UUID(g['id']))
         if not row:row=Guest(id=uuid.UUID(g['id']),family_id=uuid.UUID(g['family_id']));db.add(row)
-        for k in ['name','age','age_band','category','phone','tags','notes']:setattr(row,k,g[k])
+        for k in ['name','age','age_band','gender','sharing_mode','category','phone','tags','notes']:setattr(row,k,g[k])
         row.arrival=date.fromisoformat(g['arrival']) if g['arrival'] else None
     db.flush();after=snapshot(db);checked=hard_check(after,after['assignments'])
     old={w['id'] for w in validate(before,before['assignments'])['warnings']}
