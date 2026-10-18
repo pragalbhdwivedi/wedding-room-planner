@@ -48,7 +48,7 @@ Full qualifications and unresolved cases are in the requirements and open-items 
 
 The foundation uses React, TypeScript, Vite, Python/FastAPI, PostgreSQL, SQLAlchemy, Alembic, Caddy and Docker Compose. Dependency lockfiles and base-image digests are committed. React Flow and OR-Tools CP-SAT are planned for the allocation stages. See [architecture](docs/ARCHITECTURE.md).
 
-Follow the [operator guide](docs/RUNBOOK.md) to generate private runtime credentials, build, verify and start the application. The initial web service binds to host loopback for access through SSH forwarding. There is no default login or public registration. Only the owner chooses the first real username/password using a private setup key.
+Follow the [operator guide](docs/RUNBOOK.md) to generate private runtime credentials, build, verify and start the application. Web access defaults to loopback; an explicit LAN preview can bind to the host's private address. There is no default login or public registration. Only the owner chooses the first real username/password using a private setup key.
 
 ## Source-of-truth rules
 

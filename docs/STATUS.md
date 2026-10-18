@@ -17,7 +17,7 @@ Updated 19 October 2026, Asia/Kolkata.
 | Worker | Heartbeat only | Not a solver or job-processing implementation |
 | Automated verification | Passed for foundation code | 16 PostgreSQL integration checks on dedicated VM; GitHub Docker checks passed; see verification receipt |
 | Persistence | Verified within foundation scope | Controlled marker and inventory survived database-container replacement |
-| Shared access / HTTPS | Pending | Initial web access is loopback through SSH forwarding; phone/reception network rollout is not configured |
+| LAN preview / HTTPS | LAN implementation under verification | Explicit private-address binding and LAN origin policy added under D29; trusted HTTPS remains pending |
 | Backups / restore | Owner-deferred | No scheduled backup or recovery test claimed |
 | Real owner setup / acceptance | Pending | Owner chooses credentials privately; no real user or guest records entered during verification |
 

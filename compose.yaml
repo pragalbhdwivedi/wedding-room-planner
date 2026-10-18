@@ -80,7 +80,7 @@ services:
     image: wedding-planner-web:${APP_REVISION:-development}
     build: {context: frontend}
     restart: unless-stopped
-    ports: ["127.0.0.1:${WEB_PORT:-8080}:8080"]
+    ports: ["${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-8080}:8080"]
     networks: [private]
     depends_on:
       api: {condition: service_healthy}

@@ -32,6 +32,7 @@ Dates use Asia/Kolkata. The baseline was reconciled on 19 October 2026. "Confirm
 | D26 | 2026-10-19 | Confirmed | Owner explicitly deferred backup work and instructed implementation to start. No backup/restore completion is implied. |
 | D27 | 2026-10-19 | Implemented foundation choice | Private setup key creates one owner; Argon2id passwords, server sessions, CSRF, persistent throttling and owner-only viewer management. Recovery remains open. |
 | D28 | 2026-10-19 | Implemented foundation choice | Initial app binds to loopback for SSH-forwarded preview. Shared phone/reception access requires the later HTTPS ingress step. |
+| D29 | 2026-10-19 | Confirmed | Owner requested network exposure of the preview. Add explicit private-address LAN access, retaining authentication and private database/API services. Supersedes loopback-only access in D28; trusted HTTPS ingress remains separate work. |
 
 ## Future decisions
 
