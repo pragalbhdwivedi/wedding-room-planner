@@ -87,8 +87,14 @@ def parse_import(content,current):
         workbook=load_workbook(io.BytesIO(content),read_only=True,data_only=False,keep_links=False)
         if 'Guests' not in workbook.sheetnames:raise ValueError('Use the Guests sheet from the downloaded template')
         sheet=workbook['Guests']
-        if sheet.max_row>1001 or sheet.max_column>20:raise ValueError('Import supports up to 1,000 rows and the template columns')
-        cells=list(sheet.iter_rows());headers=[str(c.value or '').strip() for c in cells[0]]
+        # Worksheet dimensions are optional and may also be stale or misleading.
+        # Stream actual cells with bounds, rather than trusting cached dimensions.
+        sheet.reset_dimensions();cells=[]
+        for cell_row in sheet.iter_rows():
+            if len(cells)>=1001 or len(cell_row)>20:raise ValueError('Import supports up to 1,000 rows and the template columns')
+            cells.append(cell_row)
+        if not cells:raise ValueError('The Guests sheet is empty')
+        headers=[str(c.value or '').strip() for c in cells[0]]
         if len(headers)!=len(set(headers)) or not set(['Group','Side','Name','Age','Category','Arrival']).issubset(headers) or any(h not in HEADERS for h in headers):raise ValueError('The Guests sheet headers do not match the template')
     except (ValueError,KeyError,zipfile.BadZipFile) as error:raise HTTPException(400,str(error))
     except Exception:raise HTTPException(400,'The file is not a readable supported .xlsx workbook')

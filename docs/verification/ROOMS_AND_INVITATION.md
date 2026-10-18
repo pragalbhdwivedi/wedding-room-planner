@@ -13,3 +13,8 @@ Invitation context is stored in a private directory separate from overnight gues
 - TypeScript/Vite build completed inside Docker. Browser checks use a separate temporary preview, never real owner credentials or fixtures in the live database.
 - Browser verification and final committed-source CI/deployment binding are recorded in STATUS.md after release.
 - Real imports, names, ages, assignments, screenshots and source attachments remain outside public Git. Missing ages, arrival choices, blank source headcounts, physical adjacency and unsettled hotel pricing are not resolved by passing tests.
+
+
+## Excel compatibility follow-up
+
+Valid XLSX files may omit cached worksheet dimensions. Guest import now streams actual rows with the existing 1,000-guest and 20-column limits, ignoring optional or stale cached dimensions. A regression check covers omitted dimensions, forged small dimensions, excessive rows and far-right cells. Preview failures remain non-mutating. Runtime import data remains private.
