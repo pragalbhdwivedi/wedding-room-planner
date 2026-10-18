@@ -154,3 +154,14 @@ def test_untrusted_origin_and_validation_redaction(client, setup_key):
 def test_production_transport_fails_closed():
     with pytest.raises(ValueError):Settings(mode="production",cookie_secure=False,allowed_origins="http://127.0.0.1:8080").validate_transport()
     with pytest.raises(ValueError):Settings(mode="local",cookie_secure=False,allowed_origins="http://untrusted.example").validate_transport()
+
+
+def test_lan_preview_accepts_only_explicit_private_origins():
+    Settings(mode="lan", cookie_secure=False, allowed_origins="http://192.168.1.20:8080,http://127.0.0.1:8769").validate_transport()
+    for origin in ["http://8.8.8.8:8080", "http://public.example", "http://0.0.0.0:8080", "http://192.168.1.20:99999", "http://user@192.168.1.20:8080", "http://192.168.1.20/path", "http://192.168.1.20?value=1"]:
+        with pytest.raises(ValueError):
+            Settings(mode="lan", cookie_secure=False, allowed_origins=origin).validate_transport()
+    with pytest.raises(ValueError):
+        Settings(mode="production", cookie_secure=False, allowed_origins="http://192.168.1.20:8080").validate_transport()
+    with pytest.raises(ValueError):
+        Settings(mode="lan", cookie_secure=True, allowed_origins="http://192.168.1.20:8080").validate_transport()

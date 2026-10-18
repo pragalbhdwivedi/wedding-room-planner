@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
+from .transport import lan_origin
 
 
 class Settings(BaseSettings):
@@ -32,6 +33,11 @@ class Settings(BaseSettings):
         elif self.mode == "local":
             if any(urlparse(o).hostname not in {"localhost", "127.0.0.1", "::1"} for o in self.origins):
                 raise ValueError("Local mode requires loopback trusted origins")
+        elif self.mode == "lan":
+            if any(not lan_origin(o) for o in self.origins):
+                raise ValueError("LAN preview requires explicit private IP or loopback origins")
+            if self.cookie_secure and any(urlparse(o).scheme != "https" for o in self.origins):
+                raise ValueError("HTTP LAN preview requires non-Secure cookies; use production mode for shared HTTPS")
         elif self.mode != "test":
             raise ValueError("Unknown application mode")
 

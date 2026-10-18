@@ -38,6 +38,7 @@ Status: acceptance plan; actual results are recorded separately in STATUS.md. Us
 | A32 | Viewer password/access reset, suspension and stale access edit | Previous viewer sessions revoked; stale version rejected; owner cannot be demoted or removed. |
 | A33 | Forged cross-site request, missing CSRF token, repeated failed login | Origin/CSRF guards reject mutation; database-backed throttling limits attempts across requests. |
 | A34 | API database credential used for schema/audit changes | Non-superuser runtime role cannot create schema objects or update/delete audit history. |
+| A35 | LAN preview enabled on private VM address | Another LAN machine can load the app and health/setup endpoints; unauthenticated inventory remains blocked, untrusted origins rejected, and database/API ports remain unpublished. Production still rejects insecure settings. |
 
 ## Owner acceptance
 

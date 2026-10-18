@@ -38,6 +38,10 @@ For an upgrade, select and review the intended source commit, preserve `.private
 
 ## Transport and remaining operations
 
-The initial preview is reachable through authenticated SSH forwarding. Local mode deliberately accepts loopback origins only and uses a non-Secure cookie over that loopback HTTP connection. Before a shared phone/reception rollout, configure trusted HTTPS ingress, explicit HTTPS origins, `APP_MODE=production` and `COOKIE_SECURE=true`. Production mode refuses insecure cookie/origin settings. PostgreSQL has no host-published port.
+Web access defaults to authenticated SSH forwarding. Local mode accepts loopback origins only. The owner subsequently requested LAN access (D29). An explicit `lan` preview mode supports private IPv4 addresses and loopback origins; public addresses and arbitrary hostnames are rejected. This is an HTTP preview on the trusted LAN: credentials and sessions are not encrypted in transit. Production mode still requires HTTPS origins and Secure cookies. PostgreSQL has no host-published port.
+
+To enable LAN access on an existing deployment, preserve credentials and database volumes, set `WEB_BIND_ADDRESS` to the VM's private address, `APP_MODE=lan`, `COOKIE_SECURE=false`, and `ALLOWED_ORIGINS` to the exact browser origin including port. Keep actual operational addresses only in private `.env` and handover records. Build/check the selected source revision, then recreate application services with `sudo docker compose up -d --wait`. Verify the health/setup endpoints from a different LAN machine, origin rejection and unauthenticated data protection. Do not publish database/API ports or configure internet forwarding as part of LAN exposure.
+
+For a fresh LAN installation, the provisioner accepts `--mode lan --bind-address <private-ip> --origins http://<private-ip>:8080`. It preserves an existing `.env`, so it does not silently change an existing transport policy. For shared HTTPS, configure a trusted domain/proxy, `APP_MODE=production`, `COOKIE_SECURE=true` and explicit HTTPS origins.
 
 Backup work was explicitly deferred by the owner on 19 October 2026. No scheduled backup or restore test is claimed. Add off-host database/config backup and verified restore as a separate operational step; container persistence is not a backup.
