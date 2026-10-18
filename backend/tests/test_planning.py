@@ -183,6 +183,50 @@ def test_room_picker_subset_of_four_places_only_selected_members(client,owner):
     assert {g['id'] for g in people if g['id'] not in placed}=={people[1]['id'],people[3]['id']}
 
 
+def test_room_sharing_consent_is_previewed_and_saved_with_two_night_move(client,owner):
+    roommates=family(client,owner,[member('Synthetic Roommate A'),member('Synthetic Roommate B')],label='Roommates')
+    visitor=family(client,owner,[member('Synthetic Visitor')],label='Visitor')[0]
+    for night in NIGHTS:
+        assign(client,owner,roommates,'w-104',night)
+        assign(client,owner,[visitor],'w-201',night)
+    moves=[{'guest_id':visitor['id'],'night':night,'resource_id':'w-104'} for night in NIGHTS]
+    request={'revision':revision(client),'moves':moves}
+    first=client.post('/api/planning/assignments/preview',json=request,headers=headers(owner)).json()
+    assert not first['token'] and first['can_confirm_sharing']
+    assert len([e for e in first['errors'] if e['code']=='compatibility'])==4
+    assert first['request_moves']==moves
+    confirmed=client.post('/api/planning/assignments/preview',json={**request,'confirm_sharing':True},headers=headers(owner)).json()
+    assert confirmed['token'] and not confirmed['errors']
+    assert len([w for w in confirmed['warnings'] if w['id'].startswith('sharing_confirmation:')])==2
+    assert len(confirmed['changes'])==2
+    assert not plan(client)['links']
+    assert apply(client,owner,confirmed,ack=False).status_code==409
+    assert apply(client,owner,confirmed).status_code==200
+    saved=plan(client)
+    assert {(a['night'],a['resource_id']) for a in saved['assignments'] if a['guest_id']==visitor['id']}=={(night,'w-104') for night in NIGHTS}
+    assert len([l for l in saved['links'] if visitor['id'] in {l['a'],l['b']} and l['kind']=='may_share'])==2
+    undo=client.post('/api/planning/history',json={'revision':revision(client),'direction':'undo'},headers=headers(owner))
+    assert undo.status_code==200,undo.text
+    assert len([l for l in plan(client)['links'] if visitor['id'] in {l['a'],l['b']}])==2
+
+
+def test_sharing_consent_does_not_bypass_hard_exclusion_or_friends_rule(client,owner):
+    first=family(client,owner,[member('Synthetic First')],label='First')[0]
+    second=family(client,owner,[member('Synthetic Second')],label='Second')[0]
+    link(client,owner,first,second,'cannot_share')
+    assign(client,owner,[first],'w-104')
+    request={'revision':revision(client),'moves':[{'guest_id':second['id'],'night':NIGHTS[0],'resource_id':'w-104'}]}
+    response=client.post('/api/planning/assignments/preview',json=request,headers=headers(owner)).json()
+    assert response['errors'] and not response['can_confirm_sharing']
+    response=client.post('/api/planning/assignments/preview',json={**request,'confirm_sharing':True},headers=headers(owner)).json()
+    assert response['errors'] and not response['token']
+    male=family(client,owner,[member('Synthetic Male',gender='male',sharing_mode='friends')],label='Male friend')[0]
+    female=family(client,owner,[member('Synthetic Female',gender='female',sharing_mode='friends')],label='Female friend')[0]
+    assign(client,owner,[male],'w-102')
+    response=client.post('/api/planning/assignments/preview',json={'revision':revision(client),'moves':[{'guest_id':female['id'],'night':NIGHTS[0],'resource_id':'w-102'}],'confirm_sharing':True},headers=headers(owner)).json()
+    assert response['errors'] and not response['token']
+
+
 def test_undo_that_restores_a_warning_requires_exact_review(client,owner):
     people=family(client,owner,[member('Synthetic A'),member('Synthetic B')])
     assign(client,owner,[people[0]],'w-102')
