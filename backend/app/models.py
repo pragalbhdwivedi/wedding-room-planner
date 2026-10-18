@@ -124,6 +124,7 @@ class Guest(Base):
     family_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("families.id"), index=True)
     name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     age: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    age_band: Mapped[str] = mapped_column(String(8), default="unknown", server_default="unknown")
     category: Mapped[str] = mapped_column(String(16), default="guest")
     phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
     arrival: Mapped[object | None] = mapped_column(Date, nullable=True)
@@ -261,6 +262,15 @@ class FunctionEvent(Base):
     name: Mapped[str] = mapped_column(String(100))
     day: Mapped[object] = mapped_column(Date)
     side: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    start_time: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    venue: Mapped[str] = mapped_column(String(150), default="", server_default="")
+    source_url: Mapped[str] = mapped_column(String(250), default="", server_default="")
+
+
+class WeddingDetails(Base):
+    __tablename__ = "wedding_details"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    data: Mapped[dict] = mapped_column(JSONB, default=dict)
 
 
 class EventAttendance(Base):

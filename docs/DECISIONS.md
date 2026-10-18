@@ -39,6 +39,11 @@ Dates use Asia/Kolkata. The baseline was reconciled on 19 October 2026. "Confirm
 | D32 | 2026-10-19 | Implemented technical limit; business policy remains open | Initial allocator keeps families as units; larger groups require manual split review. Unknown ages and child arrangements beyond the known supported examples remain unresolved, not assumed safe. This does not set a newly confirmed hotel child ceiling. |
 | D33 | 2026-10-19 | Implemented least-disclosure choice | Family viewers see their own guests/placements/attendance without contacts/private notes/costs; reception sees operational contacts/attendance without private notes or costs. Owner alone changes any planning data. |
 
+| D34 | 2026-10-19 | Confirmed | Draft initial placements using supplied adult/child counts; keep missing exact ages and age-50+ accessibility checks explicitly pending. Unknown bands remain unresolved. |
+| D35 | 2026-10-19 | Confirmed | Until four Premium family-room numbers are selected, preserve an unnamed four-room reserve pool unused across both nights. Supersedes D32's exact-age prerequisite and the initial exact-reservation prerequisite. |
+| D36 | 2026-10-19 | Confirmed | Show all Wyndham rooms initially; retain block/floor filters and editable topology. |
+| D37 | 2026-10-19 | Confirmed | Add invitation function/family context privately and use its visual theme. Directory people do not automatically add accommodation headcounts; RSVP integration remains separate. |
+
 ## Future decisions
 
 Append a dated decision for each owner policy change. Mark superseded decisions explicitly and update the canonical requirement and relevant acceptance checks in the same commit. Do not rewrite a proposed design as a confirmed owner decision merely because it appeared in an assistant explanation.

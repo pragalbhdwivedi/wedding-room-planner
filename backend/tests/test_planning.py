@@ -120,7 +120,7 @@ def test_scope_no_cost_contact_or_mutation_leak(client,owner,role,side):
 
 def test_reservations_capacity_children_bedding_and_ground_floor(client,owner):
     young=family(client,owner,[member('Synthetic Parent A',35),member('Synthetic Parent B',34),member('Synthetic Child A',10),member('Synthetic Child B',4)],couple_children=True)
-    assert any(e['code']=='reservation_pending' for e in preview(client,owner,young,'w-105')['errors'])
+    assert any(e['code']=='couple_children' for e in preview(client,owner,young,'w-105')['errors'])
     reserve(client,owner)
     assert any(e['code']=='couple_children' for e in preview(client,owner,young,'w-105')['errors'])
     assign(client,owner,young,'w-102')
@@ -234,7 +234,7 @@ def test_worker_proposal_preserves_locks_scope_and_stale_apply(client,owner):
     with SessionLocal() as db:assert not validate(snapshot(db),proposal,before=before)['errors']
     p=client.post('/api/planning/allocation/'+run_id+'/preview',json={'revision':revision(client)},headers=headers(owner)).json();assert p['token']
     assert apply(client,owner,p).status_code==200
-    assert client.get('/api/planning/allocation').json()['runs'][0]['status']=='stale'
+    assert client.get('/api/planning/allocation').json()['runs'][0]['status']=='applied'
     assert client.post('/api/planning/allocation/'+run_id+'/preview',json={'revision':revision(client)},headers=headers(owner)).status_code==409
 
 
@@ -371,3 +371,77 @@ def test_one_meal_at_one_location_and_attendance_is_not_inferred(client,owner):
     meals=client.get('/api/planning/meals').json()['rows'];assert len(meals)==1 and meals[0]['actual'] is None
     # A single transaction can move a meal between locations without double counting.
     assert client.put('/api/planning/meals',json={'revision':revision(client),'rows':[{**row,'planned':False},{**row,'location':'external'}]},headers=headers(owner)).status_code==200
+
+def test_known_age_bands_enable_provisional_assignment_without_invented_ages(client,owner):
+    people=family(client,owner,[member(None,None,age_band='adult'),member(None,None,age_band='adult'),member(None,None,age_band='child')],couple_children=True)
+    p=preview(client,owner,people,'w-102');assert not p['errors'] and not p['warnings']
+    assert apply(client,owner,p).status_code==200
+    d=plan(client);assert all(g['age'] is None for g in d['guests'])
+    assert d['summary'][NIGHTS[0]]['unconfirmed_ages']==3
+    assert len(d['conflicts']['notices'])==3
+    assert client.get('/api/planning/billing').json()['nights'][NIGHTS[0]]['chargeable']==2
+    # Confirming an elder's actual age cannot silently leave them upstairs.
+    other=family(client,owner,[member(None,None,age_band='adult')],label='Synthetic Age Check')
+    assign(client,owner,other,'w-202')
+    f=next(f for f in plan(client)['families'] if f['id']==other[0]['family_id'])
+    body={**f,'revision':revision(client),'members':[{**member(None,50,age_band='adult'),'id':other[0]['id']}]};body.pop('id')
+    assert client.put('/api/planning/families/'+f['id'],json=body,headers=headers(owner)).status_code==409
+    bad={**body,'revision':revision(client),'members':[{**member(None,10,age_band='adult'),'id':other[0]['id']}]}
+    assert client.put('/api/planning/families/'+f['id'],json=bad,headers=headers(owner)).status_code==422
+
+
+def test_unnamed_reserve_pool_is_shared_across_nights_and_solver_preserves_four(client,owner):
+    with SessionLocal() as db:data=snapshot(db)
+    premium=[r for r in data['resources'] if r['hotel_id']=='wyndham' and r['category']=='premium']
+    data['resources']=premium;data['families']=[];data['guests']=[]
+    for i in range(21):
+        fid=f'synthetic-family-{i}';gid=f'synthetic-person-{i}'
+        data['families'].append({'id':fid,'label':fid,'side':'bride','reserved_eligible':False,'couple_children':False})
+        data['guests'].append({'id':gid,'family_id':fid,'name':None,'age':None,'age_band':'adult','side':'bride','reserved_eligible':False,'couple_children':False,'category':'guest','arrival':NIGHTS[0],'tags':[]})
+    rows=[{'guest_id':g['id'],'night':NIGHTS[i%2],'resource_id':premium[i]['id']} for i,g in enumerate(data['guests'])]
+    assert any(e['code']=='reserve_pool' for e in validate(data,rows)['errors'])
+    result=allocate(data);assert result['assignments'] is not None,result
+    assert len({a['resource_id'] for a in result['assignments']})<=20
+    assert len(result['unassigned'])==2 and not validate(data,result['assignments'])['errors']
+    assert sum(r['id'] not in {a['resource_id'] for a in result['assignments']} for r in premium)>=4
+
+
+def test_automatic_pool_allocation_applies_and_is_not_reported_stale(client,owner):
+    family(client,owner,[member(None,None,age_band='adult')])
+    job=client.post('/api/planning/allocation',json={'revision':revision(client)},headers=headers(owner));assert job.status_code==202
+    assert process_one()
+    p=client.post('/api/planning/allocation/'+job.json()['id']+'/preview',json={'revision':revision(client)},headers=headers(owner)).json()
+    assert p['token'] and apply(client,owner,p).status_code==200
+    assert client.get('/api/planning/allocation').json()['runs'][0]['status']=='applied'
+    exported=load_workbook(io.BytesIO(client.get('/api/planning/export.xlsx').content))
+    assert 'Age band' in [c.value for c in exported['Guests'][1]]
+    assert all(g['age'] is None and g['age_band']=='adult' for g in plan(client)['guests'])
+
+
+def test_invitation_context_is_private_scoped_and_does_not_create_guests(client,owner):
+    body={'revision':revision(client),'bride_name':'Synthetic Bride','groom_name':'Synthetic Groom','source_url':'https://example.com/invitation','family':[{'side':'bride','name':'Synthetic Bride Parent','relationship':'Father'},{'side':'groom','name':'Synthetic Groom Parent','relationship':'Mother'}]}
+    assert client.put('/api/planning/wedding-details',json=body,headers=headers(owner)).status_code==200
+    assert not plan(client)['guests']
+    assert client.put('/api/planning/wedding-details',json=body,headers=headers(owner)).status_code==409
+    invalid={**body,'revision':revision(client),'source_url':'javascript:alert(1)'}
+    assert client.put('/api/planning/wedding-details',json=invalid,headers=headers(owner)).status_code==422
+    for role,side in [('family','bride'),('reception',None)]:
+        response=client.post('/api/users',json={'username':'context.'+role,'display_name':'Synthetic viewer','password':PASSWORD,'role':role,'side':side},headers=headers(owner));assert response.status_code==201
+        with TestClient(app) as viewer:
+            login=viewer.post('/api/auth/login',json={'username':'context.'+role,'password':PASSWORD});assert login.status_code==200
+            details=viewer.get('/api/planning/wedding-details').json()
+            assert len(details['family'])==(1 if role=='family' else 2)
+            assert viewer.put('/api/planning/wedding-details',json={**body,'revision':revision(client)},headers=headers(login.json())).status_code==403
+            assert viewer.get('/api/planning/billing').status_code==403
+
+
+def test_function_times_sources_duplicate_guard_and_excel(client,owner):
+    body={'revision':revision(client),'name':'Synthetic Midnight Ceremony','day':'2026-11-26','start_time':'00:00','venue':'Synthetic venue','source_url':'https://example.com/invitation'}
+    response=client.post('/api/planning/events',json=body,headers=headers(owner));assert response.status_code==201,response.text
+    body['revision']=revision(client)
+    assert client.post('/api/planning/events',json=body,headers=headers(owner)).status_code==409
+    assert client.post('/api/planning/events',json={**body,'start_time':'24:00'},headers=headers(owner)).status_code==422
+    event=client.get('/api/planning/functions').json()['events'][0]
+    assert event['day']=='2026-11-26' and event['start_time']=='00:00'
+    wb=load_workbook(io.BytesIO(client.get('/api/planning/export.xlsx').content))
+    assert wb['Functions']['E2'].value=='00:00' and wb['Functions']['F2'].value=='Synthetic venue'

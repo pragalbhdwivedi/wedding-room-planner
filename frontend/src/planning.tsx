@@ -1,3 +1,4 @@
+import { WeddingDetailsPanel } from "./wedding-details";
 import React, {
   useCallback,
   useEffect,
@@ -55,6 +56,8 @@ type Guest = {
   family_id: string;
   name: string | null;
   age: number | null;
+  age_band?: "adult" | "child" | "unknown";
+  group_label?: string;
   category: string;
   phone?: string | null;
   arrival: string | null;
@@ -96,6 +99,7 @@ type Plan = {
   connections: any[];
   rules?: any[];
   reserved_count: number;
+  reserve_pool: number;
   summary: Record<string, any>;
   conflicts?: { errors: Warning[]; warnings: Warning[] };
   can_undo?: boolean;
@@ -145,11 +149,14 @@ const dayName = (s: string) =>
   });
 const roomName = (r: Resource) =>
   r.number || `Unnumbered · ${r.id.replace("second-", "")}`;
-const guestName = (g: Guest) => g.name || `Unnamed guest · ${g.id.slice(0, 4)}`;
+const guestName = (g: Guest) =>
+  g.name ||
+  `${g.group_label || "Unnamed guest"} · ${g.age_band === "adult" ? "Adult" : g.age_band === "child" ? "Child" : "Guest"} ${g.tags.find((t) => t.startsWith("slot_"))?.slice(5) || g.id.slice(0, 4)}`;
 const occupied = (g: Guest, n: string) => !!g.arrival && g.arrival <= n;
 const emptyMember = () => ({
   name: "",
   age: "",
+  age_band: "unknown",
   category: "guest",
   phone: "",
   arrival: nights[0],
@@ -242,6 +249,7 @@ type RoomData = {
   allowed?: boolean;
   reason?: string;
   owner: boolean;
+  topology?: boolean;
   choose: (r: Resource) => void;
   info: (r: Resource) => void;
 };
@@ -264,6 +272,7 @@ function RoomNode({ data }: { data: RoomData }) {
           data.choose(r);
         }
       }}
+      onClick={() => data.choose(r)}
       onDragOver={(e) => {
         if (data.owner) e.preventDefault();
       }}
@@ -281,8 +290,20 @@ function RoomNode({ data }: { data: RoomData }) {
         }
       }}
     >
-      <Handle type="target" position={Position.Left} isConnectable={false} />
-      <Handle type="source" position={Position.Right} isConnectable={false} />
+      {data.topology && (
+        <>
+          <Handle
+            type="target"
+            position={Position.Left}
+            isConnectable={false}
+          />
+          <Handle
+            type="source"
+            position={Position.Right}
+            isConnectable={false}
+          />
+        </>
+      )}
       <div className="plan-room-title">
         <b>{roomName(r)}</b>
         <span>
@@ -314,7 +335,9 @@ function RoomNode({ data }: { data: RoomData }) {
           data.people.map((g) => (
             <span key={g.id}>
               {guestName(g)}
-              {g.age !== null && g.age <= 10 && <small>Child</small>}
+              {(g.age !== null ? g.age <= 10 : g.age_band === "child") && (
+                <small>Child</small>
+              )}
             </span>
           ))
         ) : (
@@ -349,10 +372,11 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
     [busy, setBusy] = useState(false);
   const [night, setNight] = useState(nights[0]),
     [hotel, setHotel] = useState("wyndham"),
-    [block, setBlock] = useState("1"),
-    [floor, setFloor] = useState("0"),
+    [block, setBlock] = useState("all"),
+    [floor, setFloor] = useState("all"),
     [search, setSearch] = useState(""),
     [side, setSide] = useState(user.role === "family" ? user.side! : "all");
+  const [roomView, setRoomView] = useState("rooms");
   const [destinations, setDestinations] = useState<Record<string, any>>({});
   const [selection, setSelection] = useState<string[]>([]),
     [groupMode, setGroupMode] = useState(true),
@@ -387,6 +411,9 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
       name: "",
       day: days[1],
       side: "",
+      start_time: "",
+      venue: "",
+      source_url: "",
     });
   const [mealEditRevision, setMealEditRevision] = useState<number | null>(null),
     [functionEditRevision, setFunctionEditRevision] = useState<number | null>(
@@ -427,7 +454,11 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
   useEffect(() => {
     const track = (e: PointerEvent) => {
       const drag = pointerDrag.current;
-      if (drag && !drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) {
+      if (
+        drag &&
+        !drag.moved &&
+        Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8
+      ) {
         drag.moved = true;
         setSelection(drag.ids);
         setSwapFrom(null);
@@ -654,6 +685,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
         draggable: layoutMode && owner,
         data: {
           resource: r,
+          topology: true,
           people: data.guests.filter((g) =>
             data.assignments.some(
               (a) =>
@@ -751,6 +783,12 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
         ...(g.id ? { id: g.id } : {}),
         name: g.name || null,
         age: g.age === "" ? null : Number(g.age),
+        age_band:
+          g.age === ""
+            ? g.age_band || "unknown"
+            : Number(g.age) > 10
+              ? "adult"
+              : "child",
         category: g.category,
         phone: g.phone || null,
         arrival: g.arrival || null,
@@ -839,7 +877,9 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
           <b>{guestName(g)}</b>
           <small>
             {g.age === null
-              ? "Age needed"
+              ? g.age_band && g.age_band !== "unknown"
+                ? `${g.age_band} · exact age pending`
+                : "Age or band needed"
               : g.age <= 10
                 ? `Child · ${g.age}`
                 : `Age ${g.age}`}{" "}
@@ -1000,6 +1040,12 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
       )}
       {page === "attendance" && (
         <div className="attendance-sections">
+          <WeddingDetailsPanel
+            owner={owner}
+            revision={data.revision}
+            request={request}
+            action={action}
+          />
           <section className="settings-card">
             <h2>Actual arrivals & departures</h2>
             <p>
@@ -1121,6 +1167,29 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
           </section>
           <section className="settings-card">
             <h2>Functions & attendance</h2>
+            <p>
+              Celebration times use Asia/Kolkata. Attendance and meals are
+              recorded separately.
+            </p>
+            <div className="function-timeline">
+              {functions.events.map((event: any) => (
+                <article key={event.id}>
+                  <span className="eyebrow">
+                    {dayName(event.day)}
+                    {event.start_time
+                      ? ` · ${event.start_time}`
+                      : " · Time pending"}
+                  </span>
+                  <h3>{event.name}</h3>
+                  {event.venue && <p>{event.venue}</p>}
+                  {event.source_url && (
+                    <a href={event.source_url} target="_blank" rel="noreferrer">
+                      Invitation source ↗
+                    </a>
+                  )}
+                </article>
+              ))}
+            </div>
             {owner && (
               <form
                 className="planner-toolbar"
@@ -1130,6 +1199,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                     revision: data.revision,
                     ...eventDraft,
                     side: eventDraft.side || null,
+                    start_time: eventDraft.start_time || null,
                   });
                   if (result) {
                     setFunctionId(result.id);
@@ -1176,6 +1246,44 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                     <option value="groom">Groom side</option>
                   </select>
                 </label>
+                <label className="small-field">
+                  Time (Asia/Kolkata)
+                  <input
+                    type="time"
+                    value={eventDraft.start_time}
+                    onInput={(e) =>
+                      setEventDraft({
+                        ...eventDraft,
+                        start_time: e.currentTarget.value,
+                      })
+                    }
+                  />
+                </label>
+                <label className="small-field">
+                  Venue
+                  <input
+                    maxLength={150}
+                    value={eventDraft.venue}
+                    onChange={(e) =>
+                      setEventDraft({ ...eventDraft, venue: e.target.value })
+                    }
+                  />
+                </label>
+                <label className="small-field">
+                  Source link
+                  <input
+                    type="url"
+                    placeholder="https://"
+                    maxLength={250}
+                    value={eventDraft.source_url}
+                    onChange={(e) =>
+                      setEventDraft({
+                        ...eventDraft,
+                        source_url: e.target.value,
+                      })
+                    }
+                  />
+                </label>
                 <button className="primary compact" disabled={busy}>
                   Add function
                 </button>
@@ -1194,6 +1302,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                 {functions.events.map((event: any) => (
                   <option key={event.id} value={event.id}>
                     {event.name} · {dayName(event.day)}
+                    {event.start_time ? ` · ${event.start_time}` : ""}
                   </option>
                 ))}
               </select>
@@ -1382,7 +1491,10 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                                 <small>Private note saved</small>
                               )}
                             </td>
-                            <td>{g.age ?? "Unknown"}</td>
+                            <td>
+                              {g.age ??
+                                `${g.age_band || "unknown"} · age pending`}
+                            </td>
                             <td>
                               {g.arrival ? dayName(g.arrival) : "Event only"}
                             </td>
@@ -1446,7 +1558,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                 value={hotel}
                 onChange={(e) => {
                   setHotel(e.target.value);
-                  setBlock("1");
+                  setBlock("all");
                   setFloor("all");
                 }}
               >
@@ -1508,6 +1620,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                     (layoutMode ? "selected-control" : "")
                   }
                   onClick={() => {
+                    setRoomView("topology");
                     setLayoutMode(!layoutMode);
                     setSelection([]);
                   }}
@@ -1539,10 +1652,57 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
           </div>
           {owner && data.reserved_count !== 4 && (
             <div className="alert">
-              Choose the four Premium family rooms in Rooms & rules before
-              assigning Premium rooms or running allocation.
+              Four Premium rooms are held unused as a reserve pool across both
+              nights. Choose their numbers later in Rooms & rules.
             </div>
           )}
+          {data.guests.some(
+            (g) =>
+              g.tags.includes("arrival_unconfirmed") ||
+              g.tags.includes("headcount_unconfirmed"),
+          ) && (
+            <div className="alert">
+              Source details pending: some arrivals use 24 Nov as a draft and
+              blank child counts still need confirmation. The roster includes
+              only listed people; final attendance may change.
+            </div>
+          )}
+          {summary.unconfirmed_ages > 0 && (
+            <div className="alert">
+              Provisional plan: {summary.unconfirmed_ages} exact ages are
+              unconfirmed for this night. Supplied adult/child counts guide
+              placement and estimates. Check who is 50+ or needs ground floor
+              before finalising.
+            </div>
+          )}
+          <div className="room-view-controls">
+            <button
+              className={
+                roomView === "rooms" ? "primary compact" : "secondary compact"
+              }
+              onClick={() => {
+                setRoomView("rooms");
+                setLayoutMode(false);
+              }}
+            >
+              All rooms
+            </button>
+            <button
+              className={
+                roomView === "topology"
+                  ? "primary compact"
+                  : "secondary compact"
+              }
+              onClick={() => setRoomView("topology")}
+            >
+              Topology
+            </button>
+            <span>
+              Showing {resourceList.length} of{" "}
+              {data.resources.filter((r) => r.hotel_id === hotel).length}{" "}
+              {hotel === "staff" ? "beds" : "rooms"} · scroll for the full list
+            </span>
+          </div>
           {owner && currentJob && (
             <div className="job-panel">
               <div>
@@ -1555,11 +1715,13 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                 <p>
                   {["queued", "running"].includes(currentJob.status)
                     ? "The worker is considering family groups, capacities, eligibility and locks."
-                    : currentJob.status === "stale"
-                      ? "The plan changed. Run a fresh proposal."
-                      : currentJob.result?.assignments
-                        ? `${currentJob.result.assigned_count} person-nights placed · ${currentJob.result.unassigned?.length || 0} person-nights unassigned`
-                        : (currentJob.result?.diagnostics || []).join(" ")}
+                    : currentJob.status === "applied"
+                      ? "This automatic proposal has been applied to the plan."
+                      : currentJob.status === "stale"
+                        ? "The plan changed. Run a fresh proposal."
+                        : currentJob.result?.assignments
+                          ? `${currentJob.result.assigned_count} person-nights placed · ${currentJob.result.unassigned?.length || 0} person-nights unassigned`
+                          : (currentJob.result?.diagnostics || []).join(" ")}
                 </p>
               </div>
               {currentJob.status === "completed" &&
@@ -1725,65 +1887,82 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                 <b>
                   {layoutMode
                     ? "Move the room cards to save a schematic layout"
-                    : "Room topology"}
+                    : roomView === "rooms"
+                      ? "All rooms"
+                      : "Room topology"}
                 </b>
                 <span>
                   Schematic · Corridor proximity uses confirmed links only
                 </span>
               </div>
-              <div className="flow-canvas">
-                <ReactFlow
-                  nodes={nodes}
-                  onNodeClick={(_, node) =>
-                    chooseRoom((node.data as RoomData).resource)
-                  }
-                  edges={data.connections
-                    .filter(
-                      (c) =>
-                        resourceList.some((r) => r.id === c.a) &&
-                        resourceList.some((r) => r.id === c.b),
-                    )
-                    .map((c) => ({
-                      id: c.a + "-" + c.b,
-                      source: c.a,
-                      target: c.b,
-                      label: c.kind,
-                      type: "straight",
-                      style: { stroke: "#af8b57" },
-                    }))}
-                  nodeTypes={nodeTypes}
-                  onNodesChange={(changes) =>
-                    setNodes((current) => applyNodeChanges(changes, current))
-                  }
-                  onNodeDragStop={async (_, node) => {
-                    if (layoutMode && owner)
-                      await action(
-                        "/layout",
-                        {
-                          revision: data.revision,
-                          positions: [
-                            {
-                              resource_id: node.id,
-                              x: Math.max(0, node.position.x),
-                              y: Math.max(0, node.position.y),
-                            },
-                          ],
-                        },
-                        "PUT",
-                      );
-                  }}
-                  onInit={setFlow}
-                  fitView
-                  minZoom={0.1}
-                  maxZoom={2}
-                  nodesConnectable={false}
-                  nodesDraggable={layoutMode && owner}
-                  elementsSelectable={false}
+              {roomView === "rooms" ? (
+                <div
+                  className="flow-canvas all-room-grid"
+                  role="region"
+                  aria-label="All rooms"
                 >
-                  <Background gap={24} color="#d9dfd4" />
-                  <Controls showInteractive={false} />
-                </ReactFlow>
-              </div>
+                  <>
+                    {nodes.map((node) => (
+                      <RoomNode
+                        key={node.id}
+                        data={{ ...(node.data as RoomData), topology: false }}
+                      />
+                    ))}
+                  </>
+                </div>
+              ) : (
+                <div className="flow-canvas">
+                  <ReactFlow
+                    nodes={nodes}
+                    onNodeClick={() => {}}
+                    edges={data.connections
+                      .filter(
+                        (c) =>
+                          resourceList.some((r) => r.id === c.a) &&
+                          resourceList.some((r) => r.id === c.b),
+                      )
+                      .map((c) => ({
+                        id: c.a + "-" + c.b,
+                        source: c.a,
+                        target: c.b,
+                        label: c.kind,
+                        type: "straight",
+                        style: { stroke: "#af8b57" },
+                      }))}
+                    nodeTypes={nodeTypes}
+                    onNodesChange={(changes) =>
+                      setNodes((current) => applyNodeChanges(changes, current))
+                    }
+                    onNodeDragStop={async (_, node) => {
+                      if (layoutMode && owner)
+                        await action(
+                          "/layout",
+                          {
+                            revision: data.revision,
+                            positions: [
+                              {
+                                resource_id: node.id,
+                                x: Math.max(0, node.position.x),
+                                y: Math.max(0, node.position.y),
+                              },
+                            ],
+                          },
+                          "PUT",
+                        );
+                    }}
+                    onInit={setFlow}
+                    fitView
+                    minZoom={0.1}
+                    maxZoom={2}
+                    nodesConnectable={false}
+                    nodesDraggable={layoutMode && owner}
+                    elementsSelectable={false}
+                  >
+                    <Background gap={24} color="#d9dfd4" />
+                    <Controls showInteractive={false} />
+                  </ReactFlow>
+                </div>
+              )}
               <div className="canvas-legend">
                 <span>
                   <i className="side-dot bride" />
@@ -1823,7 +2002,27 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                     ? "Other-side usage hidden"
                     : summary.free_rooms,
                 ],
-                ["Family rooms reserved", data.reserved_count],
+                ["Family rooms held", data.reserved_count || data.reserve_pool],
+                [
+                  "Wyndham general rooms left",
+                  owner
+                    ? Math.max(
+                        0,
+                        summary.properties.wyndham.empty -
+                          (data.reserve_pool ||
+                            data.resources.filter(
+                              (r) =>
+                                r.reserved &&
+                                !data.assignments.some(
+                                  (a) =>
+                                    a.night === night && a.resource_id === r.id,
+                                ),
+                            ).length),
+                      )
+                    : "Usage hidden",
+                ],
+                ["Unnamed reserve pool", data.reserve_pool],
+                ["Exact ages pending", summary.unconfirmed_ages],
                 ["Staff beds used", summary.staff_beds_used],
                 ["Extra bedding", summary.extra_bedding],
               ].map(([k, v]) => (
@@ -1881,9 +2080,29 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
           <section className="settings-card">
             <h2>Four rooms for family</h2>
             <p>
-              Select exactly four Premium rooms. General guests cannot use them.
+              Four Premium rooms stay unused as a reserve pool until you select
+              their exact numbers. Named family rooms remain blocked from
+              general guests.
             </p>
-            <b>{data.reserved_count} of 4 selected</b>
+            <b>
+              {data.reserved_count
+                ? `${data.reserved_count} named rooms selected`
+                : "4-room unnamed reserve pool active"}
+            </b>
+            {data.reserved_count > 0 && (
+              <button
+                className="text-button"
+                onClick={() =>
+                  action(
+                    "/reservations",
+                    { revision: data.revision, room_ids: [] },
+                    "PUT",
+                  )
+                }
+              >
+                Use unnamed reserve pool instead
+              </button>
+            )}
             <div className="reservation-chips">
               {data.resources
                 .filter((r) => r.reserved)
@@ -2424,7 +2643,8 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
             </div>
             <p className="form-help">
               {familyDraft.members.length} guest slots. Blank names are allowed;
-              add ages before assigning rooms. Add one slot for each person.
+              enter exact ages or an adult/child band for provisional placement.
+              Add one slot for each person.
             </p>
             <div className="member-cards">
               {familyDraft.members.map((g: any, i: number) => {
@@ -2462,6 +2682,18 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                           onChange={(e) => edit("age", e.target.value)}
                           placeholder="Unknown"
                         />
+                      </label>
+                      <label>
+                        Adult / child count
+                        <select
+                          value={g.age_band || "unknown"}
+                          onChange={(e) => edit("age_band", e.target.value)}
+                          disabled={g.age !== ""}
+                        >
+                          <option value="unknown">Unknown</option>
+                          <option value="adult">Adult (above 10)</option>
+                          <option value="child">Child (10 or below)</option>
+                        </select>
                       </label>
                     </div>
                     <div className="form-row">

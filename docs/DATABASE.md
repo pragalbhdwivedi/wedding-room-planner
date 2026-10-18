@@ -73,3 +73,8 @@ The earlier logical model is a design map. The deployed implementation uses `pla
 `pending_changes` hold short-lived owner/revision-bound import or assignment previews. `plan_changes` and `bill_snapshots` are append-only to the runtime role. `allocation_runs` holds the private snapshot, lease/attempt state and reviewable result. `meal_attendance`, `guest_presence`, `function_events` and `event_attendance` distinguish planned meals/functions from actual attendance and actual arrival timestamps. `billing_settings` and explicit `hotel_charge_days` hold missing/provisional price inputs alongside the foundation `event_policy`. Source does not contain real runtime records.
 
 The allocator uses CP-SAT in the separate worker, with whole-family units, hard domain/capacity/compatibility/lock constraints, and bounded preference scoring. Every returned proposal is validated again by the shared rules and accepted through the same revision-safe preview/apply path. SSE emits only a revision and session-expiry signal; entity data is fetched again through scoped endpoints. This release does not implement a transactional event outbox or arbitrary FET rule execution.
+
+
+### Count-based drafts and invitation context
+
+Additive migration `0003_age_bands` stores explicit adult/child/unknown age bands with consistency constraints; unknown exact ages stay NULL. Migration `0004_wedding_details` stores the private couple/family directory separately from guest occupancy and adds nullable local time, venue and source provenance to functions. These changes do not recreate owner identities or replace existing planning records. Directory names and all real imports remain private runtime data.

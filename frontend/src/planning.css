@@ -61,7 +61,7 @@
   flex: 1;
   border: 1px solid #dce2d5;
   border-radius: 6px;
-  background: #fff;
+  background: #fbf7ee;
   padding: 0 12px;
 }
 .search-box input {
@@ -82,7 +82,7 @@
 .small-field select {
   border: 1px solid #dce2d5;
   border-radius: 6px;
-  background: #fff;
+  background: #fbf7ee;
   padding: 10px 30px 10px 10px;
   min-height: 42px;
   color: #2a453b;
@@ -94,7 +94,7 @@
 }
 .guest-total > b {
   font-size: 22px;
-  color: #183d35;
+  color: #0d1a11;
 }
 .guest-total > a {
   float: right;
@@ -240,7 +240,7 @@
 }
 .segmented button.active {
   background: #254d40;
-  color: #fff;
+  color: #fbf7ee;
 }
 .guest-scroll {
   max-height: 500px;
@@ -255,7 +255,7 @@
   width: 100%;
   border: 1px solid #e1e6dc;
   border-radius: 6px;
-  background: #fff;
+  background: #fbf7ee;
   padding: 12px 9px;
   margin-bottom: 8px;
   color: #254b3e;
@@ -339,7 +339,7 @@
 .flow-canvas {
   height: 650px;
   border-radius: 0 0 8px 8px;
-  background: #f5f6ee;
+  background: #e7dbc2;
 }
 .react-flow__attribution {
   font-size: 8px;
@@ -350,7 +350,7 @@
   border-radius: 9px;
   border: 1px solid #d7dfcc;
   border-left: 4px solid #b8c5a7;
-  background: #fdfefb;
+  background: #f4ecdb;
   color: #234738;
   box-shadow: 0 3px 8px #203b2110;
   padding: 13px 14px;
@@ -784,7 +784,7 @@
 .planning-dialog textarea {
   min-height: 43px;
   width: 100%;
-  background: #fff;
+  background: #fbf7ee;
   border: 1px solid #dce3d2;
   border-radius: 6px;
   padding: 10px 12px;
@@ -1084,7 +1084,7 @@
   }
   .mobile-planner-tabs button.active {
     background: #254d3e;
-    color: #fff;
+    color: #fbf7ee;
   }
   .planner-grid.show-rooms > .guest-drawer,
   .planner-grid.show-rooms > .live-summary,
@@ -1314,7 +1314,7 @@
   padding: 9px;
   border: 1px solid #dce2d5;
   border-radius: 5px;
-  background: #fff;
+  background: #fbf7ee;
 }
 .warning-review small {
   display: block;
@@ -1326,4 +1326,37 @@
 }
 .guest-choice:enabled {
   cursor: grab;
+}
+
+.room-view-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.room-view-controls > span {
+  color: #687d6c;
+  font-size: 12px;
+}
+.all-room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  align-content: start;
+  gap: 16px;
+  overflow-y: auto;
+  padding: 16px;
+}
+.all-room-grid .plan-room {
+  width: 100%;
+  min-height: 170px;
+  height: 100%;
+}
+.all-room-grid .room-people > span {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .all-room-grid {
+    grid-template-columns: 1fr;
+  }
 }

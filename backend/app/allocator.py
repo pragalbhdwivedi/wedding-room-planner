@@ -4,7 +4,7 @@ from itertools import combinations
 
 from ortools.sat.python import cp_model
 
-from .planning_rules import NIGHTS, STAFF, active, building, capacity_ok, compatible, matches, resource_issues, segment, validate
+from .planning_rules import NIGHTS, STAFF, active, building, capacity_ok, compatible, is_adult, matches, resource_issues, segment, validate
 
 
 def allocate(data,time_limit=10):
@@ -64,13 +64,13 @@ def allocate(data,time_limit=10):
         else:diagnostics[i]=sorted(set(reasons))[:4] or ["No compatible room is available for the complete group."]
     constants=[a for a in fixed if (a["guest_id"],a["night"]) not in represented]
     # Room/bed capacity and pair compatibility apply per night.
-    side_used={}
+    side_used={};premium_usage=defaultdict(list)
     for rid,r in resources.items():
         for n in NIGHTS:
             contributors=[(i,[g for g in u if active(g,n)]) for i,u in enumerate(units) if (i,rid) in variables and any(active(g,n) for g in u)]
             constant=[guests[a["guest_id"]] for a in constants if a["resource_id"]==rid and a["night"]==n]
             total=sum(variables[(i,rid)]*len(p) for i,p in contributors)+len(constant)
-            adults=sum(variables[(i,rid)]*sum(g['age']>10 for g in p) for i,p in contributors)+sum(g['age']>10 for g in constant)
+            adults=sum(variables[(i,rid)]*sum(is_adult(g) for g in p) for i,p in contributors)+sum(is_adult(g) for g in constant)
             model.add(adults<=r["adult_capacity"])
             model.add(total-adults<=2)  # Larger young-child arrangements await policy confirmation.
             model.add(total<=(1 if r["hotel_id"]=="staff" else 4))
@@ -82,6 +82,7 @@ def allocate(data,time_limit=10):
             used=model.new_bool_var(f"used_{rid}_{n}")
             model.add(total>=1).only_enforce_if(used);model.add(total==0).only_enforce_if(used.Not())
             scores.append(-100*used)
+            if r["hotel_id"]=="wyndham" and r["category"]=="premium":premium_usage[rid].append(used)
             for i,p in contributors:
                 if any(not compatible(a,b,data['links']) for a in p for b in constant):model.add(variables[(i,rid)]==0)
             for (i,a),(j,b) in combinations(contributors,2):
@@ -95,6 +96,11 @@ def allocate(data,time_limit=10):
                     elif candidates:model.add_max_equality(flag,candidates)
                     else:model.add(flag==0)
                     side_used[(side,rid,n)]=flag
+    if data['reserved_count']==0:
+        held=[]
+        for rid,flags in premium_usage.items():
+            used=model.new_bool_var('premium_any_'+rid);model.add_max_equality(used,flags);held.append(used)
+        model.add(sum(held)<=20)
     for link in data['links']:
         if link['severity']!='hard' or link['kind'] not in {'nearby','same_building'} or link['a'] not in unit_for or link['b'] not in unit_for:continue
         i,j=unit_for[link['a']],unit_for[link['b']]

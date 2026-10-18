@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import "./style.css";
 import { PlanningWorkspace } from "./planning";
+import "./wedding-theme.css";
 
 type User = {
   id: string;

@@ -7,7 +7,7 @@ Status: acceptance plan; actual results are recorded separately in STATUS.md. Us
 | A01 | Import the structural inventory | Exactly 44 Wyndham rooms: 20 Superior/24 Premium, 20 ground/24 first, 40 king/4 twin; six second-hotel rooms and 12 dorm beds remain separate. |
 | A02 | Reserve four Premium rooms | General Wyndham availability becomes 40 rooms; those four are excluded from general solver/manual placement and can later hold family. Pending room numbers are not guessed. |
 | A03 | Family headcount five, names entered later | Five guest slots throughout; named member completion does not increase total to ten. |
-| A04 | Ages 10 and 11 | Age 10 receives child treatment; age 11 adult treatment for billing/bedding. Unknown age stays unresolved. |
+| A04 | Ages 10 and 11 | Age 10 receives child treatment; age 11 adult treatment for billing/bedding. Missing exact age with a supplied adult/child band permits a labelled provisional draft; a wholly unknown band remains unresolved. |
 | A05 | Couple plus two children <=10 | Allowed in a Superior room with bedding under owner policy. Actual heads show four; adult-counted occupancy stays separate. Premium allocation raises the applicable family-placement issue. |
 | A06 | Superior with four adult-counted people | Capacity conflict visible; included bedding does not silently remove the adult-counted limit. Larger young-child arrangements outside known policy are flagged unresolved. |
 | A07 | Age 49, age 50, younger guest tagged ground floor | Default age 49 is not automatically forced to ground; age 50 and tagged younger guest require ground. Ground-floor shortage is explained. |
@@ -42,6 +42,10 @@ Status: acceptance plan; actual results are recorded separately in STATUS.md. Us
 
 | A36 | Actual arrivals and function attendance | Arrival/departure timestamps stay separate from planned nights; non-residents can attend functions. Family exports expose only their own side. |
 | A37 | One meal at two locations | Reject duplicate planned or actual attendance for the same person/date/meal; an atomic transfer between locations remains possible. |
+
+| A38 | No named family rooms yet | At most 20 of 24 Premium rooms used across the union of both nights; four remain unused. Named reservations still enforce eligibility. |
+| A39 | Initial room view | All 44 Wyndham cards visible by scrolling, count shown; topology and filters available on laptop/phone. |
+| A40 | Invitation family directory and function times | No duplicate accommodation guests, owner-only writes, family-side scope, source links, midnight date preserved, scoped Excel function details. |
 
 ## Owner acceptance
 

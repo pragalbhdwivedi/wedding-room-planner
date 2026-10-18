@@ -1,5 +1,5 @@
 """Exact-pa​ise estimates with explicit missing-price and coverage boundaries."""
-from .planning_rules import DAYS, NIGHTS, STAFF, active
+from .planning_rules import DAYS, NIGHTS, STAFF, active, age_band, is_adult
 
 
 def calculate(snapshot, policy, settings, meals, charge_days, *, basis="planned"):
@@ -10,8 +10,8 @@ def calculate(snapshot, policy, settings, meals, charge_days, *, basis="planned"
     for night in NIGHTS:
         located={a["guest_id"]:resources[a["resource_id"]] for a in rows if a["night"]==night}
         wyndham=[guests[g] for g,r in located.items() if r["hotel_id"]=="wyndham"]
-        adults=sum(g["age"] is not None and g["age"]>10 for g in wyndham)
-        unknown=sum(g["age"] is None for g in wyndham)
+        adults=sum(is_adult(g) for g in wyndham)
+        unknown=sum(age_band(g)=="unknown" for g in wyndham)
         excess=max(0,adults-policy["wyndham_allowance"])
         amount=excess*policy["wyndham_excess_paise"]
         lines.append({"day":night,"kind":"wyndham_excess","quantity":excess,"rate_paise":policy["wyndham_excess_paise"],"amount_paise":amount,"status":"planning_assumption"})
@@ -41,11 +41,11 @@ def calculate(snapshot, policy, settings, meals, charge_days, *, basis="planned"
             unpriced.append({**base,"kind":"coverage_unknown","reason":"Confirm package inclusion before charging this meal."});continue
         if attendance["location"]=="wyndham" and g["category"] in STAFF:
             rate=policy["staff_meal_paise"];kind="staff_meal"
-        elif attendance["location"]=="wyndham" and g["age"] is not None:
-            rate=settings["guest_meals"].get(attendance["meal"]+('_adult' if g["age"]>10 else '_child'));kind="guest_meal"
+        elif attendance["location"]=="wyndham" and age_band(g)!="unknown":
+            rate=settings["guest_meals"].get(attendance["meal"]+('_adult' if is_adult(g) else '_child'));kind="guest_meal"
         else:rate=None;kind="meal_unpriced"
         if rate is None:unpriced.append({**base,"kind":kind,"reason":"The applicable meal rate is not supplied."})
         else:lines.append({**base,"kind":kind,"rate_paise":rate,"amount_paise":rate,"status":"confirmed_rate" if kind=="staff_meal" else "owner_entered_estimate"})
     unknown_ages=sum(g["age"] is None for g in guests.values())
-    if unknown_ages:unpriced.append({"kind":"guest_ages_unknown","quantity":unknown_ages,"reason":"Complete unknown guest ages before final reconciliation."})
+    if unknown_ages:unpriced.append({"kind":"guest_ages_unknown","quantity":unknown_ages,"reason":"Exact ages remain unconfirmed; supplied adult/child counts are used for provisional estimates. Confirm accessibility and final reconciliation."})
     return {"basis":basis,"currency":"INR","lines":lines,"known_subtotal_paise":sum(l["amount_paise"] for l in lines),"unpriced":unpriced,"complete":not unpriced,"provisional":True,"nights":night_totals,"policy":policy,"settings":settings,"charge_days":sorted(charge_days),"assumptions":["No Wyndham allowance carryover between nights.","Second-hotel daily price and billable days remain subject to confirmation.","Included bedding is not charged again.","Meal inclusion is explicit; unconfirmed coverage is not billed as a separate meal."]}

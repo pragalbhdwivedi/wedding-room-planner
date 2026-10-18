@@ -27,3 +27,8 @@ Read [Planning guide](PLANNING_GUIDE.md) for the workflow and [Open items](OPEN_
 PR #4 merged as `e4e730a4429a042d6e3e5fef335cb687ae1da2c3`. The deployed images carry the tested application head `0a92f0bbd45db1c3daa0b0c509bc2d2ad8ba04b0`; the merge and this subsequent evidence update do not change application code. Deployment verified 18 October 2026 21:29 UTC (19 October in Asia/Kolkata). Existing owner credential rows, sessions, private secrets and the database volume were preserved; setup is no longer required.
 
 The real LAN service serves the updated application; unauthenticated inventory, planning, billing and Excel requests return 401. Only web ingress is published. No synthetic test records were inserted into the real database. The separate temporary preview/database was removed after checks. The actual owner workflow has not yet received explicit event-use acceptance.
+
+
+## Room visibility, provisional allocation and invitation update
+
+Implementation in progress on the next release: all-room initial grid, adult/child-band drafts with pending exact ages, four-room unnamed Premium reserve across both nights, explicit source-hotel tags, accurate applied-job status, private invitation family directory, timed functions and invitation theme. The preceding 40-check working build passed before the invitation changes; final head-bound verification/deployment evidence will replace this work-in-progress note. No real guest data is committed to Git.
