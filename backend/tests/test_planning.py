@@ -462,7 +462,7 @@ def test_excel_optional_or_stale_dimensions_remain_bounded(client,owner):
                 target.writestr(item,data)
         return changed.getvalue()
     current=plan(client)
-    result=parse_import(content(),current);assert not result['errors'] and len(result['guests'])==1
+    payload,errors,warnings=parse_import(content(),current);assert not errors and not warnings and len(payload['guests'])==1
     for invalid in [content(1001),content(far_column=True),content(1001,dimension=b'<dimension ref="A1:A1"/>')]:
         with pytest.raises(Exception) as caught:parse_import(invalid,current)
         assert caught.value.status_code==400 and '1,000' in caught.value.detail
