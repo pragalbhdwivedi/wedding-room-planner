@@ -4,7 +4,7 @@ Canonical source of truth for the wedding accommodation planner: requirements, d
 
 Canonical repository: [pragalbhdwivedi/wedding-room-planner](https://github.com/pragalbhdwivedi/wedding-room-planner), branch `main`.
 
-**Current state: requirements and design baseline only. No application, database migration, Docker deployment, or automatic allocator has been implemented or tested.**
+**Current state: requirements/design recorded and dedicated Debian Docker host prepared. The application, database migrations, app containers, and automatic allocator have not been implemented or deployed.**
 
 The owner requested this public repository on 19 October 2026 (Asia/Kolkata) to prevent future ambiguity. The repository records the room-planning application separately from the existing invitation website.
 
@@ -21,6 +21,7 @@ The owner requested this public repository on 19 October 2026 (Asia/Kolkata) to 
 | [Delivery plan](docs/ROADMAP.md) | Implementation order |
 | [Acceptance checks](docs/ACCEPTANCE.md) | Behaviour that must be demonstrated |
 | [Status](docs/STATUS.md) | What exists and what has been verified |
+| [Infrastructure](docs/INFRASTRUCTURE.md) | Dedicated Debian Docker host and verification limits |
 | [Data policy](docs/DATA_POLICY.md) | Public source versus private runtime data |
 | [Contributing](CONTRIBUTING.md) | How to keep this repository authoritative |
 

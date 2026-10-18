@@ -90,3 +90,7 @@ Shared state must persist in a private database. Record allocation changes, lock
 ## R12 - Canonical project record
 
 The owner requested a new public repository on their GitHub profile as the source of truth. Maintain confirmed requirements, proposed architecture, database design, decisions, open items, implementation status, and code together. Reference attachments remain outside public Git history.
+
+## R13 - Dedicated infrastructure
+
+Owner instruction on 19 October 2026: download a fresh Debian cloud image, create template 9002 on Nageshwar, retain template 9001's cloud-init login/access details where present, and create a new dedicated VM on that node's local-lvm sized for this application. Later clarification: normal VLAN 1 and an owner-supplied static /23 address for the new VM. Actual connection details belong only in private handover records. Original template and existing guests must be preserved. Docker-host preparation does not itself constitute application implementation/deployment or backup acceptance.
