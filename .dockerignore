@@ -1,0 +1,14 @@
+.git
+.private
+.env*
+!.env.example
+VM_NOTES
+sources
+uploads
+backups
+exports
+node_modules
+**/node_modules
+**/__pycache__
+docs
+.work

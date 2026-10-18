@@ -1,6 +1,6 @@
 # Acceptance checks
 
-Status: future verification plan, not test results. Use synthetic records only. Bind evidence to the exact source revision and environment; automated results, deployment, and owner acceptance are distinct.
+Status: acceptance plan; actual results are recorded separately in STATUS.md. Use synthetic records only. Bind evidence to the exact source revision and environment; automated results, deployment, and owner acceptance are distinct. Foundation checks exercise authentication, viewer administration and structural inventory, not the future guest workflows.
 
 | ID | Scenario | Expected result |
 | --- | --- | --- |
@@ -34,6 +34,10 @@ Status: future verification plan, not test results. Use synthetic records only. 
 | A28 | Restore protected backups to isolated environment | Usable data restored and checked; evidence excludes secrets/real private data. |
 | A29 | Change a rate / missing price | Date and rate provenance remain traceable; missing is not zero; historical/estimate status not silently overwritten. |
 | A30 | New image and schema upgrade | Migrations complete before readiness, failure blocks rollout, and rollback/restore path is documented and tested appropriately. |
+| A31 | Owner setup without private key / two simultaneous valid attempts | Missing/wrong key rejected; exactly one owner is created. No default credentials. |
+| A32 | Viewer password/access reset, suspension and stale access edit | Previous viewer sessions revoked; stale version rejected; owner cannot be demoted or removed. |
+| A33 | Forged cross-site request, missing CSRF token, repeated failed login | Origin/CSRF guards reject mutation; database-backed throttling limits attempts across requests. |
+| A34 | API database credential used for schema/audit changes | Non-superuser runtime role cannot create schema objects or update/delete audit history. |
 
 ## Owner acceptance
 

@@ -1,6 +1,6 @@
-# Proposed architecture
+# Application architecture
 
-Status: application architecture remains proposed, not implemented. Docker delivery is owner-confirmed; dedicated host preparation is recorded in INFRASTRUCTURE.md. Concrete application library/base-image versions will be pinned after compatibility checks at implementation time.
+Status: the foundation implements web/API/database services, a heartbeat-only worker, one-off migrations, authentication, viewer administration and inventory. Dependencies are locked and base images are pinned by digest. Solver jobs, live events, imports and backups in the broader design below remain planned. See STATUS.md for verification evidence.
 
 ## Components
 
@@ -53,7 +53,7 @@ Proposed preference order: accessibility and mandatory constraints, coupled/link
 
 ## Authentication and authorization
 
-Username/password with Argon2id hashes and server-side sessions in secure HTTP-only cookies. Include CSRF protection, session expiry/revocation, login throttling, and private response caching controls. Owner bootstrap/reset mechanism remains to be designed without public/default credentials.
+Implemented foundation: username/password with Argon2id hashes, hashed server-side session tokens, HTTP-only SameSite cookies, CSRF checks, session expiry/revocation, persistent login throttling and no-store API responses. Private-key bootstrap creates the sole owner transactionally; there are no default credentials or public registration. Cookie security is enforced for production HTTPS; the loopback preview has an explicit local transport mode. Account recovery remains open.
 
 Only the one owner account may mutate planning/settings/access records. Family viewers have side scopes; reception has an operational field allowlist excluding costs. Scope API response schemas, event payloads, errors, and exports before transmission. No public guest-data endpoints or public self-registration.
 
@@ -68,7 +68,7 @@ Use revision numbers for optimistic concurrency even though only one account edi
 - PostgreSQL is not published directly to the internet. Only web ingress is exposed. HTTPS terminates at Caddy or a chosen existing trusted proxy, depending on deployment.
 - Database, authorised uploads, and certificate/config state use persistent volumes. Secrets are provided outside images/source using restricted mounted files/Compose secrets; host source files still need protection.
 - Apply migrations once before new application services become ready. Fail deployment on migration errors.
-- Dedicated VM 9601 is prepared with 4 vCPU, 4 GiB RAM and 40 GiB local-lvm storage under the owner's infrastructure instruction; see INFRASTRUCTURE.md and private VM_NOTES. Domain/ingress, backup policy and app deployment remain pending.
+- Dedicated VM 9601 has 4 vCPU, 4 GiB RAM and 40 GiB local-lvm storage under the owner's infrastructure instruction; see INFRASTRUCTURE.md and private VM_NOTES. Shared HTTPS ingress remains pending. Backup was explicitly deferred by the owner while foundation implementation proceeds.
 - Pin dependencies/images at implementation; retain lockfiles and provenance. Do not claim a production version from an untested floating latest tag.
 
 ## Backups and upgrades

@@ -1,0 +1,25 @@
+name: Foundation checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  docker-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Prepare isolated credentials
+        run: sudo python3 scripts/prepare_runtime.py --revision "$GITHUB_SHA"
+      - name: Build backend and browser application
+        run: sudo docker compose build api web
+      - name: Build verification image
+        run: sudo docker compose -f compose.test.yaml build test
+      - name: Start isolated PostgreSQL
+        run: sudo docker compose -f compose.test.yaml up -d --wait testdb
+      - name: Apply migrations to isolated database
+        run: sudo docker compose -f compose.test.yaml run --rm --no-deps migrate-test
+      - name: Verify authentication, permissions and inventory
+        run: sudo docker compose -f compose.test.yaml run --rm --no-deps test
+      - name: Remove isolated verification database
+        if: always()
+        run: sudo docker compose -f compose.test.yaml down --volumes

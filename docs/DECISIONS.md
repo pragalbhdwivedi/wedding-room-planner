@@ -29,6 +29,9 @@ Dates use Asia/Kolkata. The baseline was reconciled on 19 October 2026. "Confirm
 | D23 | 2026-10-19 | Confirmed | Fresh Debian template 9002 and a new dedicated application VM on Nageshwar local-lvm; preserve source template 9001. |
 | D24 | 2026-10-19 | Confirmed; latest network instruction | Normal/native VLAN 1, not the source template's AADI VLAN. Owner supplies static /23 address for the application VM; template remains DHCP. Connection details stay private. |
 | D25 | 2026-10-19 | Implemented infrastructure choice | Template 9002 and full clone 9601; application VM 4 vCPU, 4 GiB RAM, 40 GiB disk. Docker Engine 29.9.1 / Compose 5.6.0 installed and host reboot verified; application not built. |
+| D26 | 2026-10-19 | Confirmed | Owner explicitly deferred backup work and instructed implementation to start. No backup/restore completion is implied. |
+| D27 | 2026-10-19 | Implemented foundation choice | Private setup key creates one owner; Argon2id passwords, server sessions, CSRF, persistent throttling and owner-only viewer management. Recovery remains open. |
+| D28 | 2026-10-19 | Implemented foundation choice | Initial app binds to loopback for SSH-forwarded preview. Shared phone/reception access requires the later HTTPS ingress step. |
 
 ## Future decisions
 

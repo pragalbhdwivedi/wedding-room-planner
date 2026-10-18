@@ -1,6 +1,6 @@
-# Proposed database design
+# Database design
 
-Status: logical design only. No SQL schema or migration has been executed. Proposed engine: PostgreSQL. Structured access: SQLAlchemy; migrations: Alembic.
+The foundation implements PostgreSQL with SQLAlchemy and Alembic. Migration `0001_foundation` creates users, sessions, login_throttle, change_history, hotels, rooms, staff_beds, event_policy and worker_heartbeat. User role/side checks, one-owner uniqueness/protection and separate migration/runtime privileges are enforced in the database. The broader planning model below remains a design until its migrations and features are introduced.
 
 ## Model
 

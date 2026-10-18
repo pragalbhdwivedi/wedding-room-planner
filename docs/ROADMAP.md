@@ -1,6 +1,6 @@
 # Delivery plan
 
-Status: application phases remain planned. Repository documentation and a dedicated Debian Docker host are prepared; see INFRASTRUCTURE.md. Host readiness does not complete phase 1's application/login/database deliverables. Subsequent implementation should be reviewed against REQUIREMENTS.md and ACCEPTANCE.md.
+Status: phase 1 is implemented, technically verified and deployed as a private preview. Read-only structural inventory from phase 2 is included; reservations and editable topology remain pending. Real owner setup and acceptance are still pending. STATUS.md records actual check/deployment results. Subsequent implementation is reviewed against REQUIREMENTS.md and ACCEPTANCE.md.
 
 | Phase | Deliverables | Evidence before claiming completion |
 | --- | --- | --- |
@@ -15,4 +15,4 @@ Status: application phases remain planned. Repository documentation and a dedica
 
 ## Initial implementation deliverables
 
-Expected files include frontend/backend source, Dockerfiles, actual Compose configurations, lockfiles, schema migrations, synthetic seed data, verification code, and operator instructions. These will be added when implemented; this documentation baseline deliberately does not pretend those files are runnable now.
+Foundation files include frontend/backend source, Dockerfiles, actual Compose configurations, lockfiles, a schema/inventory migration, synthetic verification fixtures, CI and operator instructions. No real guest seed data is included.
