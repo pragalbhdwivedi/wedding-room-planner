@@ -1,10 +1,10 @@
 # Wedding Room Planner
 
-Canonical source of truth for the wedding accommodation planner: requirements, decisions, architecture, implementation status, and eventually application code.
+Canonical source of truth for the wedding accommodation planner: requirements, decisions, architecture, implementation status and application code.
 
 Canonical repository: [pragalbhdwivedi/wedding-room-planner](https://github.com/pragalbhdwivedi/wedding-room-planner), branch `main`.
 
-**Current state: requirements/design recorded and dedicated Debian Docker host prepared. The application, database migrations, app containers, and automatic allocator have not been implemented or deployed.**
+**Current scope: Docker foundation, PostgreSQL migrations, protected owner setup/login, viewer account management and room inventory. Guest entry, topology editing, allocation and billing remain future stages.** Verification and deployment evidence are recorded in [status](docs/STATUS.md).
 
 The owner requested this public repository on 19 October 2026 (Asia/Kolkata) to prevent future ambiguity. The repository records the room-planning application separately from the existing invitation website.
 
@@ -22,6 +22,7 @@ The owner requested this public repository on 19 October 2026 (Asia/Kolkata) to 
 | [Acceptance checks](docs/ACCEPTANCE.md) | Behaviour that must be demonstrated |
 | [Status](docs/STATUS.md) | What exists and what has been verified |
 | [Infrastructure](docs/INFRASTRUCTURE.md) | Dedicated Debian Docker host and verification limits |
+| [Operator guide](docs/RUNBOOK.md) | Installation, private owner setup, checks and upgrades |
 | [Data policy](docs/DATA_POLICY.md) | Public source versus private runtime data |
 | [Contributing](CONTRIBUTING.md) | How to keep this repository authoritative |
 
@@ -43,11 +44,11 @@ Only the owner's application login may change planning data or settings. Family 
 
 Full qualifications and unresolved cases are in the requirements and open-items documents. The source workbook and all personal guest data are excluded from this public repository.
 
-## Proposed stack
+## Application stack
 
-React, TypeScript, Vite, React Flow, Python/FastAPI, OR-Tools CP-SAT, PostgreSQL, SQLAlchemy, Alembic, and Docker Compose. These are design proposals, not installed or deployed components. See [architecture](docs/ARCHITECTURE.md).
+The foundation uses React, TypeScript, Vite, Python/FastAPI, PostgreSQL, SQLAlchemy, Alembic, Caddy and Docker Compose. Dependency lockfiles and base-image digests are committed. React Flow and OR-Tools CP-SAT are planned for the allocation stages. See [architecture](docs/ARCHITECTURE.md).
 
-There is no working start command yet. A Compose file will be added with an actual runnable implementation rather than a misleading placeholder.
+Follow the [operator guide](docs/RUNBOOK.md) to generate private runtime credentials, build, verify and start the application. The initial web service binds to host loopback for access through SSH forwarding. There is no default login or public registration. Only the owner chooses the first real username/password using a private setup key.
 
 ## Source-of-truth rules
 

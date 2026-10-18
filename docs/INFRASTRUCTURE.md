@@ -40,16 +40,16 @@ Template 9001 had a cloud-init login name but no cloud-init SSH keys/password re
 - Windows and WSL SSH key authentication and passwordless sudo succeeded with a trusted guest host-key pin obtained through Proxmox.
 - Docker service active and enabled; installed from Docker's official Debian apt repository with repository-scoped signing key.
 - Isolated hello-world container passed with network disabled, read-only filesystem, dropped capabilities, no-new-privileges, and automatic removal.
-- No containers or volumes left after the check. Only the smoke image is cached; no application services are deployed.
+- No containers or volumes were left after the initial infrastructure smoke check. Subsequent application work is recorded separately in STATUS.md.
 - One graceful reboot passed: static address, SSH identity, guest agent, Docker Engine, and Compose available afterward.
 - Complete non-secret handovers are maintained locally and in Proxmox Notes, with provider readback verification.
 
 ## Remaining limits
 
-- Existing backup server was unreachable during inspection; neither new resource is included in a scheduled backup job. Backup destination and restore testing are pending. Existing backup jobs were not changed.
+- Existing backup server was unreachable during inspection; neither new resource is included in a scheduled backup job. The owner subsequently deferred backup work under D26. Existing backup jobs were not changed.
 - Cloud-init reports a deprecation notice for Proxmox's generated string user field. Its provisioning errors list is empty; future cloud-init compatibility still needs monitoring.
 - The template itself was not booted; its first-boot behaviour was exercised through the full clone.
-- No application code, application database/schema, app Docker images, CI run, public ingress, or user acceptance exists yet.
-- Domain, HTTPS routing, backup policy, and application deployment remain separate work. This is a dedicated wedding-planner host, not a shared CI worker.
+- This receipt covers infrastructure only; application implementation, checks and deployment are tracked in STATUS.md. Public ingress and user acceptance are not claimed here.
+- Domain, HTTPS routing and backup policy remain separate work. This is a dedicated wedding-planner host, not a shared CI worker.
 
 Installation reference: [Docker Engine on Debian](https://docs.docker.com/engine/install/debian/).

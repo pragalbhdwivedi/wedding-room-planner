@@ -1,0 +1,1 @@
+"""Wedding Room Planner application."""

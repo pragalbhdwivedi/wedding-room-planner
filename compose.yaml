@@ -1,0 +1,103 @@
+name: wedding-planner
+
+x-backend: &backend
+  image: wedding-planner-backend:${APP_REVISION:-development}
+  build:
+    context: backend
+    target: runtime
+  restart: unless-stopped
+  init: true
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  networks: [private]
+  environment: &app-environment
+    PLANNER_DATABASE_HOST: db
+    PLANNER_DATABASE_NAME: planner
+    PLANNER_DATABASE_USER: planner_app
+    PLANNER_DATABASE_PASSWORD_FILE: /run/secrets/db_app_password
+    PLANNER_BOOTSTRAP_TOKEN_FILE: /run/secrets/bootstrap_token
+    PLANNER_MODE: ${APP_MODE:-production}
+    PLANNER_COOKIE_SECURE: ${COOKIE_SECURE:-true}
+    PLANNER_ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://localhost}
+    PLANNER_REVISION: ${APP_REVISION:-development}
+  secrets: [db_app_password]
+  depends_on:
+    db: {condition: service_healthy}
+    migrate: {condition: service_completed_successfully}
+
+services:
+  db:
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: planner
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_admin_password
+    secrets: [db_admin_password, db_app_password, db_migration_password]
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./database/init.sh:/docker-entrypoint-initdb.d/10-roles.sh:ro
+    networks: [private]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U postgres -d planner]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    <<: *backend
+    restart: "no"
+    command: [alembic, upgrade, head]
+    environment:
+      <<: *app-environment
+      PLANNER_DATABASE_USER: planner_migrate
+      PLANNER_DATABASE_PASSWORD_FILE: /run/secrets/db_migration_password
+    secrets: [db_migration_password]
+    depends_on:
+      db: {condition: service_healthy}
+
+  api:
+    <<: *backend
+    secrets: [db_app_password, bootstrap_token]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health',timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    <<: *backend
+    command: [python, -m, app.worker]
+    healthcheck:
+      test: [CMD, python, -c, "from app.db import SessionLocal; from app.models import WorkerHeartbeat,now; from datetime import timedelta; s=SessionLocal(); h=s.get(WorkerHeartbeat,'foundation'); assert h and h.seen_at>now()-timedelta(seconds=35)"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+
+  web:
+    image: wedding-planner-web:${APP_REVISION:-development}
+    build: {context: frontend}
+    restart: unless-stopped
+    ports: ["127.0.0.1:${WEB_PORT:-8080}:8080"]
+    networks: [private]
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/api/health]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+networks:
+  private:
+
+volumes:
+  postgres_data:
+
+secrets:
+  db_admin_password: {file: ./.private/db_admin_password}
+  db_app_password: {file: ./.private/db_app_password}
+  db_migration_password: {file: ./.private/db_migration_password}
+  bootstrap_token: {file: ./.private/bootstrap_token}

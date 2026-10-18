@@ -1,0 +1,45 @@
+name: wedding-planner-checks
+services:
+  testdb:
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    environment:
+      POSTGRES_DB: planner
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_admin_password
+    secrets: [db_admin_password, db_app_password, db_migration_password]
+    volumes: ["./database/init.sh:/docker-entrypoint-initdb.d/10-roles.sh:ro"]
+    tmpfs: [/var/lib/postgresql]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U postgres -d planner]
+      interval: 2s
+      retries: 30
+  migrate-test:
+    image: wedding-planner-backend:${APP_REVISION:-development}
+    environment: &test-environment
+      PLANNER_DATABASE_HOST: testdb
+      PLANNER_DATABASE_NAME: planner
+      PLANNER_DATABASE_USER: planner_migrate
+      PLANNER_DATABASE_PASSWORD_FILE: /run/secrets/db_migration_password
+      PLANNER_MODE: test
+      PLANNER_COOKIE_SECURE: "false"
+      PLANNER_ALLOWED_ORIGINS: http://testserver
+    secrets: [db_migration_password]
+    command: [alembic, upgrade, head]
+    depends_on:
+      testdb: {condition: service_healthy}
+  test:
+    image: wedding-planner-tests:${APP_REVISION:-development}
+    build: {context: backend, target: test}
+    environment:
+      <<: *test-environment
+      PLANNER_DATABASE_USER: planner_app
+      PLANNER_DATABASE_PASSWORD_FILE: /run/secrets/db_app_password
+      PLANNER_BOOTSTRAP_TOKEN_FILE: /run/secrets/test_bootstrap_token
+    secrets: [db_app_password, db_migration_password, test_bootstrap_token]
+    depends_on:
+      migrate-test: {condition: service_completed_successfully}
+secrets:
+  db_admin_password: {file: ./.private/db_admin_password}
+  db_app_password: {file: ./.private/db_app_password}
+  db_migration_password: {file: ./.private/db_migration_password}
+  test_bootstrap_token: {file: ./.private/test_bootstrap_token}
