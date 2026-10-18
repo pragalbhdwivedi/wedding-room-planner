@@ -18,3 +18,8 @@ Invitation context is stored in a private directory separate from overnight gues
 ## Excel compatibility follow-up
 
 Valid XLSX files may omit cached worksheet dimensions. Guest import now streams actual rows with the existing 1,000-guest and 20-column limits, ignoring optional or stale cached dimensions. A regression check covers omitted dimensions, forged small dimensions, excessive rows and far-right cells. Preview failures remain non-mutating. Runtime import data remains private.
+
+
+## Unnamed guest review labels
+
+Unnamed people retain their stable slots. Assignment review, warnings and unresolved diagnostics now use the same family label plus adult/child slot identifier as the room cards. A missing referenced guest is explicitly labelled as no longer listed. This changes display only; it does not rename people, allocate additional rooms or alter saved guest data. Browser verification checks a private owner preview without applying a second placement.

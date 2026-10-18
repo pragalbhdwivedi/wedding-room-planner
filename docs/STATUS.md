@@ -6,16 +6,16 @@ Updated 19 October 2026, Asia/Kolkata. Implementation, automated verification, d
 | --- | --- | --- |
 | Dedicated Docker host | Prepared and checked | Dedicated Debian VM, private persistent PostgreSQL, web-only LAN ingress |
 | Owner login / viewer administration | Implemented; real owner setup completed | Existing sole owner preserved; family/reception remain viewers |
-| Guest/family entry | Implemented | Stable unnamed slots, ages/categories/tags, resident/non-resident selection, private contacts/notes |
-| Reservations and topology | Implemented | Four exact Premium reservations, schematic layout editing, confirmed corridor connections and restaurant flags |
+| Guest/family entry | Implemented | Stable unnamed slots and adult/child bands, pending exact-age flags, private contacts/notes and resident selection |
+| Reservations and topology | Implemented | All-room initial grid, optional four-room Premium reserve pool or four named reservations, editable schematic layout and confirmed corridor/restaurant flags |
 | Manual assignments | Implemented | Individual/family drag/drop and tap, previews, compatibility highlights, locks, atomic swaps, assignment undo/redo |
 | Automatic allocation | Implemented | Leased worker jobs, bounded CP-SAT proposals, whole-family units, honest unresolved diagnostics, owner-reviewed transactional apply |
-| Attendance | Implemented | Planned/actual meals and functions; actual arrival/departure records; duplicate meal-location guard |
+| Attendance | Implemented | Private invitation family directory, dated/timed functions and attendance; separate arrivals/meals; no duplicate accommodation headcounts |
 | Billing | Implemented estimates | Integer paise, per-night allowance, staff meals, explicit inclusion, provisional second-hotel days, unknown-price list and immutable snapshots |
 | Excel and live views | Implemented | Owner guest import preview, stable-ID re-import, scoped multi-sheet exports, revision-only events, reconnect refresh and stale guards |
-| Automated verification | Passed | 37 isolated PostgreSQL checks; GitHub Actions run 39167830399 passed for final application head `0a92f0b` |
+| Automated verification | Passed | 43 isolated PostgreSQL checks; GitHub Actions run 39171190235 passed for application head `00294ca` |
 | Browser verification | Passed within synthetic preview scope | Laptop 1440x900 and phone 390x844; first drag, tap, warning review, reviewed worker apply, guest/function entry and reception contact view; no browser errors captured |
-| Current real deployment | Running and healthy | `0a92f0bbd45db1c3daa0b0c509bc2d2ad8ba04b0`, schema `0002_planning`; four healthy services; account/session/secret/volume preservation verified |
+| Current real deployment | Running and healthy | `00294cad75f273bdd82ec0958c67e62e4e96ef1c`, schema `0004_wedding_details`; four healthy services; account/session/secret/volume preservation verified |
 | HTTPS / backup / acceptance | Pending or deferred | Trusted HTTPS remains open; backups owner-deferred; no owner acceptance for event use yet |
 
 The previous deployed foundation image was `7fee89fde677d594b2183c3e2cf6ec657467bf77`, schema `0001_foundation`; historical evidence is retained in verification/FOUNDATION.md and verification/LAN.md. The planning upgrade adds schema `0002_planning`. It does not rerun setup or replace credentials.
@@ -31,4 +31,10 @@ The real LAN service serves the updated application; unauthenticated inventory, 
 
 ## Room visibility, provisional allocation and invitation update
 
-Implementation in progress on the next release: all-room initial grid, adult/child-band drafts with pending exact ages, four-room unnamed Premium reserve across both nights, explicit source-hotel tags, accurate applied-job status, private invitation family directory, timed functions and invitation theme. The preceding 40-check working build passed before the invitation changes; final head-bound verification/deployment evidence will replace this work-in-progress note. No real guest data is committed to Git.
+The all-room grid, provisional adult/child-band drafts, four-room unnamed Premium reserve, explicit source-hotel tags, applied-job status, private invitation directory, timed functions and invitation theme are deployed. Valid Excel imports with omitted/stale cached dimensions are supported with streaming bounds.
+
+PR #5 application head `0e841ce5b9b24f49f29b6736a1c7b3c1b967094d` passed 42 checks in [run 39170820221](https://github.com/pragalbhdwivedi/wedding-room-planner/actions/runs/39170820221), merged as `c9e3e983ca1072ef4fd743b1ad14ae44326e8a12`. PR #6 import follow-up head `00294cad75f273bdd82ec0958c67e62e4e96ef1c` passed 43 checks in [run 39171190235](https://github.com/pragalbhdwivedi/wedding-room-planner/actions/runs/39171190235), merged as `cb4eb4db99c0467f209ee35a78a07b464c7a48ae`. Matching Docker images were built from committed Git archives on the dedicated Debian host. Deployment verified 18 October 2026 22:14:45 UTC; schema 0004, four services healthy, credentials/sessions/secrets and the same database volume preserved.
+
+Browser checks verified 44 initial room cards, topology switching, reviewed family drag/tap, provisional age-band placement, invitation directory save and 26 November 00:00 function entry. Phone layouts measured equal document/client widths of 375px. An owner-assisted private roster import, invitation context entry and reviewed allocation were applied and checked in the live service. Real names, ages, room assignments and screenshots remain outside Git. Exact ages, provisional arrivals and blank source headcounts remain flagged for owner review. No hotel policy, final bill, HTTPS/backup completion or owner event-use acceptance is implied.
+
+A final display-only follow-up uses the same family/slot labels in review rows, warning lists and unresolved diagnostics as in the room cards. Its exact committed-source verification and deployment will be appended below.
