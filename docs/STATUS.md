@@ -8,7 +8,7 @@ Updated 19 October 2026, Asia/Kolkata. Implementation, automated verification, d
 | Owner login / viewer administration | Implemented; real owner setup completed | Existing sole owner preserved; family/reception remain viewers |
 | Guest/family entry | Implemented | Stable unnamed slots and adult/child bands, pending exact-age flags, private contacts/notes and resident selection |
 | Reservations and topology | Implemented | All-room initial grid, optional four-room Premium reserve pool or four named reservations, editable schematic layout and confirmed corridor/restaurant flags |
-| Manual assignments | Implemented | Individual/family drag/drop and tap, previews, compatibility highlights, locks, atomic swaps, assignment undo/redo |
+| Manual assignments | Implemented; room-side subset picker pending release verification | Individual/family drag/drop and tap, tick any subset from a target room, previews, compatibility highlights, locks, atomic swaps, assignment undo/redo |
 | Automatic allocation | Implemented | Leased worker jobs, bounded CP-SAT proposals, whole-family units, honest unresolved diagnostics, owner-reviewed transactional apply |
 | Attendance | Implemented | Private invitation family directory, dated/timed functions and attendance; separate arrivals/meals; no duplicate accommodation headcounts |
 | Billing | Implemented estimates | Integer paise, per-night allowance, staff meals, explicit inclusion, provisional second-hotel days, unknown-price list and immutable snapshots |

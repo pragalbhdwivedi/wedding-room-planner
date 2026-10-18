@@ -169,6 +169,20 @@ def test_warning_preview_binds_revision_exact_ack_and_is_single_use(client,owner
     assert len(plan(client)['assignments'])==1
 
 
+def test_room_picker_subset_of_four_places_only_selected_members(client,owner):
+    people=family(client,owner,[member(f'Synthetic Member {i}',25+i) for i in range(4)])
+    chosen=[people[0],people[2]]
+    p=preview(client,owner,chosen,'w-102')
+    assert p['token'] and not p['errors']
+    assert {c['guest_id'] for c in p['changes']}=={g['id'] for g in chosen}
+    assert any(w['code']=='family_split' for w in p['warnings'])
+    assert apply(client,owner,p,ack=False).status_code==409
+    assert apply(client,owner,p).status_code==200
+    placed={a['guest_id'] for a in plan(client)['assignments'] if a['resource_id']=='w-102' and a['night']==NIGHTS[0]}
+    assert placed=={g['id'] for g in chosen}
+    assert {g['id'] for g in people if g['id'] not in placed}=={people[1]['id'],people[3]['id']}
+
+
 def test_undo_that_restores_a_warning_requires_exact_review(client,owner):
     people=family(client,owner,[member('Synthetic A'),member('Synthetic B')])
     assign(client,owner,[people[0]],'w-102')
