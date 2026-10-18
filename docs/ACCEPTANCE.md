@@ -1,6 +1,6 @@
 # Acceptance checks
 
-Status: acceptance plan; actual results are recorded separately in STATUS.md. Use synthetic records only. Bind evidence to the exact source revision and environment; automated results, deployment, and owner acceptance are distinct. Foundation checks exercise authentication, viewer administration and structural inventory, not the future guest workflows.
+Status: acceptance plan; actual results are recorded separately in STATUS.md. Use synthetic records only. Bind evidence to the exact source revision and environment; automated results, deployment, and owner acceptance are distinct. The automated suite now includes guest workflows, scope/privacy, allocation jobs, exact money, import/export and additive migration preservation. Browser checks supplement these; neither replaces owner acceptance.
 
 | ID | Scenario | Expected result |
 | --- | --- | --- |
@@ -39,6 +39,9 @@ Status: acceptance plan; actual results are recorded separately in STATUS.md. Us
 | A33 | Forged cross-site request, missing CSRF token, repeated failed login | Origin/CSRF guards reject mutation; database-backed throttling limits attempts across requests. |
 | A34 | API database credential used for schema/audit changes | Non-superuser runtime role cannot create schema objects or update/delete audit history. |
 | A35 | LAN preview enabled on private VM address | Another LAN machine can load the app and health/setup endpoints; unauthenticated inventory remains blocked, untrusted origins rejected, and database/API ports remain unpublished. Production still rejects insecure settings. |
+
+| A36 | Actual arrivals and function attendance | Arrival/departure timestamps stay separate from planned nights; non-residents can attend functions. Family exports expose only their own side. |
+| A37 | One meal at two locations | Reject duplicate planned or actual attendance for the same person/date/meal; an atomic transfer between locations remains possible. |
 
 ## Owner acceptance
 

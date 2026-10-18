@@ -1,6 +1,6 @@
-# Foundation operator guide
+# Operator guide
 
-This release supplies owner login, viewer account management and a read-only room inventory. It does not yet assign guests, calculate bills, import files or run an allocator.
+This release includes the private planning workflows described in [Planning guide](PLANNING_GUIDE.md). PostgreSQL migration `0002_planning` adds these tables without replacing owner credentials, sessions or the foundation inventory.
 
 ## First installation
 
@@ -26,13 +26,13 @@ The provisioner creates private random database passwords and bootstrap keys onc
 
 Web access initially binds only to the host loopback port 8080. Use an SSH forward to a local browser port, such as 8769; both loopback origins are configured by the provisioner. The operator supplies the private contents of `.private/bootstrap_token` directly to the owner. Never paste it into GitHub, logs or chat.
 
-Open the forwarded page and enter the setup key, display name, chosen username and password of at least 14 characters. There are no default credentials. Owner creation is transactional and single-use; concurrent attempts cannot create a second owner. Keep the chosen password privately. Account recovery is not implemented in this foundation release; do not improvise a public reset endpoint.
+Open the forwarded page and enter the setup key, display name, chosen username and password of at least 14 characters. There are no default credentials. Owner creation is transactional and single-use; concurrent attempts cannot create a second owner. Keep the chosen password privately. Account recovery is not implemented; do not improvise a public reset endpoint.
 
-After setup, only the owner can create and manage family/reception viewer accounts. Family accounts require a bride/groom side. Reception accounts have no side and do not receive cost policy fields. All viewers are read-only. Updating access, suspending an account or resetting its password revokes that viewer's sessions. Existing guest records and operational contact fields do not exist yet; their side/field scoping must be verified when introduced.
+After setup, only the owner can create and manage family/reception viewer accounts. Family accounts require a bride/groom side. Reception accounts have no side and do not receive cost policy fields. All viewers are read-only. Updating access, suspending an account or resetting its password revokes that viewer's sessions. Guest, assignment, attendance, event and Excel responses enforce the same side/field restrictions. Family viewers do not receive contacts or private notes; reception receives operational contacts but no cost data.
 
 ## Restart, persistence and upgrades
 
-PostgreSQL data uses a named volume at the PostgreSQL 18 data parent directory. Recreating application containers preserves it. The migration service must finish successfully before API/worker startup. The worker currently records a health heartbeat only; it does not allocate rooms or process files.
+PostgreSQL data uses a named volume at the PostgreSQL 18 data parent directory. Recreating application containers preserves it. The migration service must finish successfully before API/worker startup. The worker records a health heartbeat and claims allocation jobs with a bounded lease, two recovery attempts and a bounded solver time. It produces proposals, never applied room changes.
 
 For an upgrade, select and review the intended source commit, preserve `.private/` and `.env`, and update only `APP_REVISION` in `.env` to that commit. Build and run the isolated checks before starting changed services. Schema rollback and password rotation are not automated. Do not replace secrets against an existing database or assume a previous container image can reverse a schema migration.
 
@@ -45,3 +45,11 @@ To enable LAN access on an existing deployment, preserve credentials and databas
 For a fresh LAN installation, the provisioner accepts `--mode lan --bind-address <private-ip> --origins http://<private-ip>:8080`. It preserves an existing `.env`, so it does not silently change an existing transport policy. For shared HTTPS, configure a trusted domain/proxy, `APP_MODE=production`, `COOKIE_SECURE=true` and explicit HTTPS origins.
 
 Backup work was explicitly deferred by the owner on 19 October 2026. No scheduled backup or restore test is claimed. Add off-host database/config backup and verified restore as a separate operational step; container persistence is not a backup.
+
+## Planning upgrades and rollback
+
+Migration `0002_planning` is additive; it preserves foundation users, password hashes and sessions. Runtime cannot update/delete audit, assignment-history or saved-estimate rows. Test downgrade/upgrade is exercised only against disposable synthetic data. Never downgrade the live planning database: it would remove planning tables and their data. A compatible forward fix is the preferred recovery after real entries; retain the previous images and preserve the private volume. The prior foundation app expects schema 0001 and cannot serve a 0002 database without a compatible health/version change.
+
+Solver jobs accept at most 300 resident guests, run for up to 10 seconds by default (15-second code ceiling), and keep a family together as an initial allocation unit. Oversized or unresolved units remain unassigned with reasons; review a manual split explicitly. Imports support at most 1,000 guest slots, 5 MiB compressed workbook content, 20 MiB expanded content, and no formulas/macros/external workbook links. Import and move previews expire and must be repeated after any newer plan revision.
+
+The server sends revision-only events and rechecks session expiry; clients reload the scoped state and fall back to a 15-second refresh. A connection is not an offline-editing guarantee. Changing a rate does not overwrite saved estimate snapshots. Actual arrival timestamps and meal/event attendance are separate from planned accommodation nights.

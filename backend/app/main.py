@@ -26,6 +26,13 @@ SignedIn = Annotated[User, Depends(current_user)]
 
 @app.middleware("http")
 async def transport_guard(request: Request, call_next):
+    if request.method == "POST" and request.url.path == "/api/planning/import/preview":
+        try:
+            length=int(request.headers.get("content-length", "-1"))
+        except ValueError:
+            return JSONResponse({"detail":"Invalid upload length"},status_code=400)
+        if length<0:return JSONResponse({"detail":"Upload Content-Length is required"},status_code=411)
+        if length>5500000:return JSONResponse({"detail":"Workbook exceeds the upload limit"},status_code=413)
     if request.method not in {"GET", "HEAD", "OPTIONS"}:
         origin = request.headers.get("origin")
         if request.headers.get("sec-fetch-site") == "cross-site" or (origin and origin.rstrip("/") not in settings().origins):
@@ -113,7 +120,7 @@ def start_session(db: Session, user: User, response: Response) -> dict:
 @app.get("/api/health")
 def health(db: DB):
     revision = db.scalar(text("SELECT version_num FROM alembic_version"))
-    if revision != "0001_foundation":
+    if revision != "0002_planning":
         raise HTTPException(503, "Database migration is pending")
     return {"status": "ok"}
 
@@ -238,10 +245,16 @@ def inventory(user: SignedIn, db: DB):
     policy = db.get(EventPolicy, 1)
     result = {"hotels": hotels, "rooms": rooms, "family_reserve_pending": policy.family_reserve,
               "staff_beds": [{"id": b.id, "hotel_id": b.hotel_id} for b in db.scalars(select(StaffBed).order_by(StaffBed.id))],
-              "stage": "foundation", "guest_entry_available": False, "allocation_available": False}
+              "stage": "planning", "guest_entry_available": True, "allocation_available": True}
     if user.role == "owner":
         result["cost_policy"] = {"wyndham_allowance": policy.wyndham_allowance,
             "wyndham_excess_paise": policy.wyndham_excess_paise, "staff_meal_paise": policy.staff_meal_paise,
             "second_hotel_day_paise": policy.second_hotel_day_paise, "second_hotel_included": policy.second_hotel_included,
             "second_hotel_rate_status": "provisional", "non_resident_meal_rate": None}
     return result
+
+
+from .planning_api import router as planning_router
+from .spreadsheet_api import router as spreadsheet_router
+app.include_router(planning_router)
+app.include_router(spreadsheet_router)

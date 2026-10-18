@@ -4,9 +4,9 @@ These remain open as of the 19 October 2026 baseline. Do not invent answers. Mos
 
 | ID | Item | Required handling until resolved |
 | --- | --- | --- |
-| O01 | Four family Premium room numbers | Hold back four Premium rooms from general inventory; owner chooses exact numbers. Solver must explain pending room selection if it needs physical locations. |
+| O01 | Four family Premium room numbers | Owner chooses exact numbers in Rooms & rules. All Premium placement waits for that selection; Superior manual placement remains possible. Automatic allocation waits for all four. |
 | O02 | Exact child physical ceiling and bedding quantity | Preserve allowed example of two adults plus two young children in Superior. Do not infer unlimited children or unlimited per-room adults from included bedding. Flag arrangements outside the known policy. |
-| O03 | Adult child of a couple / family of three adult-counted people | Couple-with-children Superior rule is confirmed, but edge semantics and physical constraints for larger families need validation. Keep conflicts visible. |
+| O03 | Adult child of a couple / family of three adult-counted people | Couple-with-children Superior rule is confirmed, but edge semantics and physical constraints for larger families need validation. Keep conflicts visible; larger groups may need an owner-reviewed manual split. |
 | O04 | Corridor neighbours/opposite pairs, restaurant paths, stairs/lifts | Derive only defensible schematic positions; mark unverified relationships before relying on them as physical facts. |
 | O05 | Second-hotel name, room numbers, bed arrangements, exact layout | Clearly labelled internal placeholders; no invented real numbers. |
 | O06 | Non-resident guest meal rates | Attendance can be recorded; costs stay unpriced. INR 150 applies to assigned driver/staff/vendor categories, not automatically every non-resident. |
@@ -24,4 +24,4 @@ These remain open as of the 19 October 2026 baseline. Do not invent answers. Mos
 
 ## Explicitly deferred, not blocking the document baseline
 
-The planner's integration with the invitation/RSVP system is not part of an approved implementation scope yet. The foundation implements the basic web/API/database stack; React Flow, solver jobs and the broader planning workflow remain later stages. See STATUS.md for exact verification and deployment evidence.
+The planner's integration with the invitation/RSVP system is not part of an approved implementation scope yet. The core planning workflows are implemented. Physical and cost questions above remain explicit inputs; they are not silently resolved by a successful solver run. See STATUS.md for exact verification and deployment evidence.
