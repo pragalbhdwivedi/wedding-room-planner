@@ -13,11 +13,17 @@ Updated 19 October 2026, Asia/Kolkata. Implementation, automated verification, d
 | Attendance | Implemented | Planned/actual meals and functions; actual arrival/departure records; duplicate meal-location guard |
 | Billing | Implemented estimates | Integer paise, per-night allowance, staff meals, explicit inclusion, provisional second-hotel days, unknown-price list and immutable snapshots |
 | Excel and live views | Implemented | Owner guest import preview, stable-ID re-import, scoped multi-sheet exports, revision-only events, reconnect refresh and stale guards |
-| Automated verification | Candidate passed | 37 isolated PostgreSQL checks passed; final source binding and CI tracked in verification/PLANNING.md |
-| Browser verification | In progress | Synthetic isolated preview; canvas click handling corrected after inspection; final desktop/phone record pending |
-| Current real deployment | Foundation until planning rollout | Existing owner login and original private database stay in place during verification |
+| Automated verification | Passed | 37 isolated PostgreSQL checks; GitHub Actions run 39167830399 passed for final application head `0a92f0b` |
+| Browser verification | Passed within synthetic preview scope | Laptop 1440x900 and phone 390x844; first drag, tap, warning review, reviewed worker apply, guest/function entry and reception contact view; no browser errors captured |
+| Current real deployment | Running and healthy | `0a92f0bbd45db1c3daa0b0c509bc2d2ad8ba04b0`, schema `0002_planning`; four healthy services; account/session/secret/volume preservation verified |
 | HTTPS / backup / acceptance | Pending or deferred | Trusted HTTPS remains open; backups owner-deferred; no owner acceptance for event use yet |
 
 The previous deployed foundation image was `7fee89fde677d594b2183c3e2cf6ec657467bf77`, schema `0001_foundation`; historical evidence is retained in verification/FOUNDATION.md and verification/LAN.md. The planning upgrade adds schema `0002_planning`. It does not rerun setup or replace credentials.
 
 Read [Planning guide](PLANNING_GUIDE.md) for the workflow and [Open items](OPEN_ITEMS.md) for unresolved physical/pricing inputs. A successful technical check does not confirm those hotel policies or owner acceptance.
+
+## Planning release
+
+PR #4 merged as `e4e730a4429a042d6e3e5fef335cb687ae1da2c3`. The deployed images carry the tested application head `0a92f0bbd45db1c3daa0b0c509bc2d2ad8ba04b0`; the merge and this subsequent evidence update do not change application code. Deployment verified 18 October 2026 21:29 UTC (19 October in Asia/Kolkata). Existing owner credential rows, sessions, private secrets and the database volume were preserved; setup is no longer required.
+
+The real LAN service serves the updated application; unauthenticated inventory, planning, billing and Excel requests return 401. Only web ingress is published. No synthetic test records were inserted into the real database. The separate temporary preview/database was removed after checks. The actual owner workflow has not yet received explicit event-use acceptance.

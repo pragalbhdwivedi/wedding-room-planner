@@ -1,6 +1,6 @@
 # Delivery plan
 
-Status: phases 1–6 are implemented for technical verification. The owner has completed their login setup. Core planning deployment, exact-revision checks and browser evidence are tracked in STATUS.md; owner acceptance remains separate. Phase 7 is partial (LAN preview and persistent private database; trusted HTTPS and owner-deferred backups remain open).
+Status: phases 1â€“6 are implemented, technically verified and deployed as the private LAN preview. The owner has completed their login setup. Core planning deployment, exact-revision checks and browser evidence are recorded in STATUS.md; owner acceptance remains separate. Phase 7 is partial (LAN preview and persistent private database; trusted HTTPS and owner-deferred backups remain open).
 
 | Phase | Deliverables | Evidence before claiming completion |
 | --- | --- | --- |
