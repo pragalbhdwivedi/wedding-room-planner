@@ -423,14 +423,15 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
     if (!owner || e.pointerType !== "mouse" || e.button !== 0 || !ids.length)
       return;
     pointerDrag.current = { ids, x: e.clientX, y: e.clientY, moved: false };
-    setSelection(ids);
-    setSwapFrom(null);
   }
   useEffect(() => {
     const track = (e: PointerEvent) => {
       const drag = pointerDrag.current;
-      if (drag && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8)
+      if (drag && !drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) {
         drag.moved = true;
+        setSelection(drag.ids);
+        setSwapFrom(null);
+      }
     };
     const finish = (e: PointerEvent) => {
       const drag = pointerDrag.current;
