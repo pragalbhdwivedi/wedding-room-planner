@@ -1018,6 +1018,7 @@ label small {
   color: #a2aa94;
 }
 .table-scroll {
+  position: relative;
   overflow-x: auto;
 }
 table {
