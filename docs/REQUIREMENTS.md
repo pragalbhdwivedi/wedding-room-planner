@@ -22,6 +22,7 @@ Build a private web-based room-allocation application inside Docker. Support pho
 - The owner explicitly allowed two adults and two children aged 10 or below in a Superior room. Keep actual headcount separate from adult-counted occupancy.
 - The maximum permitted number of young children physically occupying a room has not been supplied. Do not generalise the example into unlimited physical occupancy.
 - Support named individuals, family headcounts, and later completion of names and ages. Do not double-count a family when its named members are entered.
+- Let the owner add or delete a member from a family. Show a review before deleting an existing member, including affected room placements; prevent deletion from a locked room and leave at least one member in a family. Existing attendance and links for a deleted member must no longer affect the active plan.
 - Couples and linked children should stay together. Splitting a family must produce a warning.
 - Unrelated adults may share only when explicitly marked compatible.
 - Let the owner choose male, female, or unspecified for each guest and mark guests as Friends. Initial allocation may combine adult Friends of the same selected gender and the same bride/groom side, subject to room capacity and explicit exclusions. Unspecified gender is not a match. Couples and linked children remain together.

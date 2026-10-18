@@ -559,3 +559,66 @@ def test_gender_friend_excel_roundtrip_and_older_client_preservation(client,owne
     assert client.put('/api/planning/families/'+people[0]['family_id'],json=body,headers=headers(owner)).status_code==200
     assert plan(client)['guests'][0]['gender']=='female' and plan(client)['guests'][0]['sharing_mode']=='friends'
     invalid=member(gender='guessed');response=client.post('/api/planning/families',json={'revision':revision(client),'label':'Synthetic Invalid','side':'bride','members':[invalid]},headers=headers(owner));assert response.status_code==422
+
+
+def test_adding_member_to_placed_family_is_reviewed_and_saved(client,owner):
+    people=family(client,owner,[member('Synthetic First',31)])
+    for n in NIGHTS:assign(client,owner,people,'w-102',n)
+    body=edit_body(client,people)
+    body['members'].append(member('Synthetic New',22,age_band='adult'))
+    response=client.put('/api/planning/families/'+people[0]['family_id'],json=body,headers=headers(owner))
+    assert response.status_code==200,response.text
+    p=response.json();assert p['family_edit'] and p['changes'] and not p['errors']
+    assert len(plan(client)['guests'])==1
+    applied=client.post('/api/planning/families/apply',json={'revision':p['revision'],'token':p['token'],'acknowledged':[w['id'] for w in p['warnings']]},headers=headers(owner))
+    assert applied.status_code==200,applied.text
+    data=plan(client);assert len(data['guests'])==2 and len(data['assignments'])==4
+    assert next(g for g in data['guests'] if g['name']=='Synthetic New')['age_band']=='adult'
+    assert not data['conflicts']['errors']
+
+
+def test_unknown_new_member_can_be_saved_unassigned_after_warning(client,owner):
+    people=family(client,owner,[member('Synthetic First',31)])
+    for n in NIGHTS:assign(client,owner,people,'w-102',n)
+    body=edit_body(client,people);body['members'].append(member('Synthetic Unknown',None,age_band='unknown'))
+    response=client.put('/api/planning/families/'+people[0]['family_id'],json=body,headers=headers(owner))
+    assert response.status_code==200,response.text
+    p=response.json();assert p['family_edit'] and p['warnings']
+    assert client.post('/api/planning/families/apply',json={'revision':p['revision'],'token':p['token'],'acknowledged':[]},headers=headers(owner)).status_code==409
+    applied=client.post('/api/planning/families/apply',json={'revision':p['revision'],'token':p['token'],'acknowledged':[w['id'] for w in p['warnings']]},headers=headers(owner))
+    assert applied.status_code==200,applied.text
+    data=plan(client);assert len(data['guests'])==2 and len(data['assignments'])==2 and not data['conflicts']['errors']
+
+
+def test_delete_member_reviews_placements_cleans_references_and_resets_undo(client,owner):
+    people=family(client,owner,[member('Synthetic Keep',32),member('Synthetic Delete',29)])
+    for n in NIGHTS:assign(client,owner,people,'w-102',n)
+    link(client,owner,people[0],people[1],kind='must_share')
+    with SessionLocal() as db:
+        from app.models import GuestPresence, MealAttendance
+        from datetime import date
+        gid=people[1]['id'];db.add(GuestPresence(guest_id=gid));db.add(MealAttendance(guest_id=gid,day=date.fromisoformat(NIGHTS[0]),meal='lunch',location='wyndham',planned=True));db.commit()
+    body=edit_body(client,people);body['members']=[m for m in body['members'] if m['id']==people[0]['id']]
+    response=client.put('/api/planning/families/'+people[0]['family_id'],json=body,headers=headers(owner))
+    assert response.status_code==200,response.text
+    p=response.json();assert p['removed_guest_ids']==[people[1]['id']] and len(p['changes'])==2
+    assert len(plan(client)['guests'])==2
+    applied=client.post('/api/planning/families/apply',json={'revision':p['revision'],'token':p['token'],'acknowledged':[w['id'] for w in p['warnings']]},headers=headers(owner))
+    assert applied.status_code==200,applied.text
+    data=plan(client);assert {g['id'] for g in data['guests']}=={people[0]['id']}
+    assert len(data['assignments'])==2 and not data['links'] and not data['can_undo']
+    with SessionLocal() as db:
+        assert db.get(GuestPresence,people[1]['id']) is None
+        assert not list(db.scalars(select(MealAttendance).where(MealAttendance.guest_id==people[1]['id'])))
+
+
+def test_delete_member_cannot_change_locked_room_or_last_slot(client,owner):
+    people=family(client,owner,[member('Synthetic Keep',32),member('Synthetic Delete',29)])
+    assign(client,owner,people,'w-102')
+    lock=client.put('/api/planning/locks',json={'revision':revision(client),'resource_id':'w-102','night':NIGHTS[0],'locked':True},headers=headers(owner))
+    assert lock.status_code==200
+    body=edit_body(client,people);body['members']=body['members'][:1]
+    response=client.put('/api/planning/families/'+people[0]['family_id'],json=body,headers=headers(owner))
+    assert response.status_code==409 and len(plan(client)['guests'])==2
+    body['members']=[];body['revision']=revision(client)
+    assert client.put('/api/planning/families/'+people[0]['family_id'],json=body,headers=headers(owner)).status_code==422

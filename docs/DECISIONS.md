@@ -46,6 +46,7 @@ Dates use Asia/Kolkata. The baseline was reconciled on 19 October 2026. "Confirm
 | D38 | 2026-10-19 | Confirmed | Give each guest tickable tags and a male/female selection; keep unspecified until the owner chooses. |
 | D39 | 2026-10-19 | Confirmed | Automatically combine Friends with the same selected gender only within their own bride/groom side. Keep couples and linked children together. |
 | D40 | 2026-10-19 | Implementation choice | An edit that newly requires ground floor is reviewed with a valid room move before the guest detail and assignment are saved together. The mandatory age-50 rule and locks remain enforced. |
+| D41 | 2026-10-19 | Confirmed request and implementation choice | Owner can delete a guest member. A review shows affected placements before application; linked live records are removed, and assignment undo/redo resets so a deleted identity cannot be restored accidentally. |
 
 ## Future decisions
 

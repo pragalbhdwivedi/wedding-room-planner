@@ -6,6 +6,8 @@ Only your owner login can change this plan. Family viewers see their own side; r
 
 Open **Guests & families → Add guests**. Make one slot for every person, including children, and choose the side, category and planned arrival. Blank names and ages are allowed for preparation; complete those same slots later rather than adding them again. For a provisional assignment, select Adult (>10) or Child (<=10) when the exact age is pending. Never enter an invented age. Confirm exact ages and age-50+ accessibility before finalising. Choose **Non-resident / event only** for people who attend without staying.
 
+Entering an exact age sets the adult/child choice automatically. Changing that choice clears the exact age and leaves a provisional band. In an existing family, **Add guest slot** creates another person. If that family is already placed, saving opens a review of the proposed room placement or the reason the new person remains unassigned; apply the review to finish saving. **Delete member on save** removes an existing member from the draft, then Save opens a final review of affected rooms. Closing the form cancels the pending deletion. Deleted members lose active assignments, attendance and links; assignment undo/redo starts fresh. Unlock an occupied room before deleting its member.
+
 Use **Couple with children** for the Superior-room rule and **Eligible for reserved family rooms** only for people allowed in the four family rooms. Built-in tags cover ground floor, restaurant proximity and the second hotel; extra text tags can target conditional rules. An age of 50 or above independently requires ground floor. Staff, drivers and vendors use the separate dormitory, never guest rooms.
 
 ## 2. Reserve family rooms and verify topology

@@ -853,6 +853,9 @@
   display: grid;
   gap: 9px;
 }
+.member-cards .delete-member {
+  color: #8b3445;
+}
 .dialog-actions {
   display: flex;
   gap: 12px;
