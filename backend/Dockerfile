@@ -17,4 +17,4 @@ COPY requirements-dev.lock .
 RUN pip install --no-cache-dir --require-hashes -r requirements-dev.lock
 COPY tests tests
 USER 10001:10001
-CMD ["pytest", "-q", "tests"]
+CMD ["python", "-m", "pytest", "-q", "tests"]
