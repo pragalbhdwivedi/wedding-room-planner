@@ -6,15 +6,15 @@
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-  color: #263e36;
-  background: #f7f7f2;
+  color: #1a211a;
+  background: #e7dbc2;
   font-synthesis: none;
   font-weight: 400;
-  --green: #183d35;
+  --green: #0d1a11;
   --muted: #7b877f;
   --border: #e4e7de;
-  --cream: #f7f7f2;
-  --gold: #ac8750;
+  --cream: #e7dbc2;
+  --gold: #caa566;
 }
 * {
   box-sizing: border-box;
@@ -42,7 +42,7 @@ select {
 button:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 2px solid #ac8750;
+  outline: 2px solid #caa566;
 }
 button {
   transition:
@@ -119,7 +119,7 @@ a {
   justify-content: center;
   gap: 13px;
   background: var(--green);
-  color: #fff;
+  color: #fbf7ee;
   border: 1px solid var(--green);
   border-radius: 7px;
   padding: 14px 20px;
@@ -136,7 +136,7 @@ a {
   gap: 8px;
   padding: 11px 15px;
   border: 1px solid #dce1d7;
-  background: #fff;
+  background: #fbf7ee;
   border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
@@ -187,7 +187,7 @@ label {
 input,
 select {
   border: 1px solid #dce2d8;
-  background: #fff;
+  background: #fbf7ee;
   color: #253d32;
   border-radius: 6px;
   min-height: 43px;
@@ -212,7 +212,7 @@ label small {
 .auth-story {
   position: relative;
   min-height: 100svh;
-  background: #183d35;
+  background: #0d1a11;
   color: #f5f2e7;
   padding: 45px 55px;
   overflow: hidden;
@@ -341,7 +341,7 @@ label small {
   justify-content: center;
   align-items: center;
   padding: 50px 45px;
-  background: #f7f7f1;
+  background: #e7dbc2;
 }
 .auth-card {
   max-width: 355px;
@@ -404,7 +404,7 @@ label small {
   top: 0;
   bottom: 0;
   width: 232px;
-  background: #183d35;
+  background: #0d1a11;
   color: #d7e1d3;
   padding: 30px 20px 0;
   display: flex;
@@ -439,12 +439,12 @@ label small {
   margin-left: auto;
 }
 .nav-item.active {
-  background: #315347;
+  background: #344329;
   color: #f5f4e7;
   box-shadow: inset 2px 0 #d0b980;
 }
 .nav-item:hover {
-  background: #315347;
+  background: #344329;
 }
 .coming-card {
   border: 1px solid #73917c44;
@@ -452,7 +452,7 @@ label small {
   padding: 18px 15px;
   margin-top: auto;
   color: #bccbb8;
-  background: #23483b;
+  background: #14271a;
 }
 .tiny-label {
   font-size: 8px;
@@ -1122,7 +1122,7 @@ td small {
   max-width: 470px;
   max-height: 90svh;
   overflow: auto;
-  background: #fafbf5;
+  background: #f4ecdb;
   border: 1px solid #e6e9dd;
   border-radius: 13px;
   padding: 35px;

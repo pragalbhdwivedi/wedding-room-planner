@@ -18,7 +18,7 @@ from .planning_rules import issue, validate
 from .planning_store import hard_check, locked_state, snapshot, visible_plan
 
 router=APIRouter(prefix="/api/planning")
-HEADERS=['Guest ID','Family ID','Group','Side','Reserved eligible','Couple with children','Name','Age','Category','Phone','Arrival','Tags','Private notes']
+HEADERS=['Guest ID','Family ID','Group','Side','Reserved eligible','Couple with children','Name','Age','Category','Phone','Arrival','Tags','Private notes','Age band']
 
 
 def safe(value):
@@ -44,7 +44,7 @@ def export(user:Viewer,db:DB,template:bool=False):
     if not template:
         for g in data['guests']:
             f=families[g['family_id']]
-            row=dict(zip(HEADERS,[g['id'],g['family_id'],f['label'],g['side'],f['reserved_eligible'],f['couple_children'],g['name'],g['age'],g['category'],g.get('phone'),g['arrival'],', '.join(g['tags']),g.get('notes','')]))
+            row=dict(zip(HEADERS,[g['id'],g['family_id'],f['label'],g['side'],f['reserved_eligible'],f['couple_children'],g['name'],g['age'],g['category'],g.get('phone'),g['arrival'],', '.join(g['tags']),g.get('notes',''),g.get('age_band','unknown')]))
             sheet.append([safe(row[h]) for h in headers])
         assigned=workbook.create_sheet('Assignments');assigned.append(['Guest ID','Night','Room or bed ID'])
         for a in data['assignments']:assigned.append([a['guest_id'],a['night'],a['resource_id']])
@@ -52,8 +52,8 @@ def export(user:Viewer,db:DB,template:bool=False):
         for r in data['resources']:rooms.append([r['id'],r['hotel_id'],safe(r['number']),r['category'],r['floor'],r['reserved']])
         presence=workbook.create_sheet('Arrivals');presence.append(['Guest ID','Status']+(['Arrived at','Departed at'] if user.role!='family' else []))
         for row in data['presence']:presence.append([row['guest_id'],row['status']]+([row['arrived_at'],row['departed_at']] if user.role!='family' else []))
-        functions=event_data(db,user);events=workbook.create_sheet('Functions');events.append(['ID','Function','Date','Side'])
-        for event in functions['events']:events.append([event['id'],safe(event['name']),event['day'],event['side']])
+        functions=event_data(db,user);events=workbook.create_sheet('Functions');events.append(['ID','Function','Date','Side','Time (Asia/Kolkata)','Venue','Source'])
+        for event in functions['events']:events.append([event['id'],safe(event['name']),event['day'],event['side'],event['start_time'],safe(event['venue']),safe(event['source_url'])])
         attended=workbook.create_sheet('Function attendance');attended.append(['Function ID','Guest ID','Planned','Actual'])
         for row in functions['rows']:attended.append([row[k] for k in ['event_id','guest_id','planned','actual']])
         meals=workbook.create_sheet('Meals');meals.append(['Guest ID','Date','Meal','Location','Planned','Actual']+(['Inclusion'] if user.role=='owner' else []))
@@ -64,7 +64,7 @@ def export(user:Viewer,db:DB,template:bool=False):
             cost.append(['','Known subtotal','','',bill['known_subtotal_paise'],'Estimate; unpriced items listed below'])
             for item in bill['unpriced']:cost.append([item.get('day'),safe(item['reason']),item.get('quantity'),None,None,'UNPRICED'])
     instructions=workbook.create_sheet('Read me');instructions.append(['Instructions'])
-    for text in ['One row is one guest slot. Completing a name does not add a second person.','Preserve Guest ID and Family ID on re-import. Blank IDs create new records, with duplicate warnings.','New groups require Group and Side (bride or groom). Ages may be blank but assignment waits for an age.','Arrival is 2026-11-24, 2026-11-25 or blank for a non-resident. Category: guest, driver, staff, vendor.','Built-in tags: ground_floor, second_hotel, near_restaurant. Additional tags use short text.','Use the owner import preview before applying. Import does not delete records or assign rooms.','Private notes and costs are omitted from viewer exports. Formula-like user text is exported as text.']:
+    for text in ['One row is one guest slot. Completing a name does not add a second person.','Preserve Guest ID and Family ID on re-import. Blank IDs create new records, with duplicate warnings.','New groups require Group and Side (bride or groom). Ages may be blank. Supply Age band adult/child for provisional assignment, or unknown to leave unresolved.','Arrival is 2026-11-24, 2026-11-25 or blank for a non-resident. Category: guest, driver, staff, vendor.','Built-in tags: ground_floor, second_hotel, near_restaurant. Additional tags use short text.','Use the owner import preview before applying. Import does not delete records or assign rooms.','Private notes and costs are omitted from viewer exports. Formula-like user text is exported as text.']:
         instructions.append([text])
     for s in workbook:decorate(s)
     output=io.BytesIO();workbook.save(output)
@@ -120,7 +120,7 @@ def parse_import(content,current):
             name=row.get('Name')
             # Undo only the formula-protection prefix produced by our exporter.
             if isinstance(name,str) and name.startswith(("'=","'+","'-","'@")):name=name[1:]
-            value=GuestInput(name=name,age=None if age in [None,''] else int(float(age)),category=str(row.get('Category') or 'guest').strip().lower(),phone=str(row['Phone']) if row.get('Phone') is not None else None,arrival=arrival,tags=[t.strip() for t in str(row.get('Tags') or '').split(',') if t.strip()],notes=str(row.get('Private notes') or ''))
+            value=GuestInput(name=name,age_band=str(row.get('Age band') or (old or {}).get('age_band','unknown')).strip().lower(),age=None if age in [None,''] else int(float(age)),category=str(row.get('Category') or 'guest').strip().lower(),phone=str(row['Phone']) if row.get('Phone') is not None else None,arrival=arrival,tags=[t.strip() for t in str(row.get('Tags') or '').split(',') if t.strip()],notes=str(row.get('Private notes') or ''))
             guest={**value.model_dump(mode='json',exclude={'id'}),'id':gid,'family_id':fid,'side':side,'reserved_eligible':family['reserved_eligible'],'couple_children':family['couple_children']}
             if guest['name'] and guest['name'].casefold() in names and not old:warnings.append(issue('import_duplicate_name_'+str(row_index),'A new row has a name already present. Review duplicates before adding another slot.',severity='warning',guests=[gid]))
             if guest['name']:names.add(guest['name'].casefold())
@@ -166,7 +166,7 @@ def apply_import(body:ApplyInput,user:Owner,db:DB):
     for g in pending.payload['guests']:
         row=db.get(Guest,uuid.UUID(g['id']))
         if not row:row=Guest(id=uuid.UUID(g['id']),family_id=uuid.UUID(g['family_id']));db.add(row)
-        for k in ['name','age','category','phone','tags','notes']:setattr(row,k,g[k])
+        for k in ['name','age','age_band','category','phone','tags','notes']:setattr(row,k,g[k])
         row.arrival=date.fromisoformat(g['arrival']) if g['arrival'] else None
     db.flush();after=snapshot(db);checked=hard_check(after,after['assignments'])
     old={w['id'] for w in validate(before,before['assignments'])['warnings']}

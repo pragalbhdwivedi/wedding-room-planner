@@ -14,7 +14,7 @@ from .billing import calculate
 from .db import SessionLocal, database
 from .models import (AllocationRun, Audit, BillSnapshot, BillingSettings, EventAttendance, EventPolicy, Family, FunctionEvent, Guest, GuestLink, GuestPresence,
                      HotelChargeDay, LoginSession, MealAttendance, PendingChange, PlanChange, PlanState,
-                     PlanningRule, Resource, Room, RoomConnection, RoomLock, User, now)
+                     PlanningRule, Resource, Room, RoomConnection, RoomLock, User, WeddingDetails, now)
 from .planning_rules import DAYS, NIGHTS, validate
 from .planning_store import assignments, hard_check, locked_state, save_assignments, snapshot, visible_plan
 from .security import COOKIE, current_user, digest, require_csrf, require_owner
@@ -38,11 +38,17 @@ class GuestInput(Input):
     id:uuid.UUID|None=None
     name:str|None=Field(default=None,max_length=100)
     age:int|None=Field(default=None,ge=0,le=120)
+    age_band:Literal["adult","child","unknown"]="unknown"
     category:Literal["guest","driver","staff","vendor"]="guest"
     phone:str|None=Field(default=None,max_length=40)
     arrival:Literal["2026-11-24","2026-11-25"]|None="2026-11-24"
     tags:list[str]=Field(default_factory=list,max_length=30)
     notes:str=Field(default="",max_length=2000)
+
+    @model_validator(mode="after")
+    def consistent_age_band(self):
+        if self.age is not None and self.age_band not in ["unknown", "child" if self.age<=10 else "adult"]:raise ValueError("Age and adult/child count disagree")
+        return self
 
     @field_validator("name","phone")
     @classmethod
@@ -126,14 +132,14 @@ def update_family(family_id:uuid.UUID,body:FamilyInput,user:Owner,db:DB):
     return record(db,user,state,"family.updated",{"family_id":str(family_id),"slots":len(body.members)})
 
 
-class Reservations(Revision):room_ids:list[str]=Field(min_length=4,max_length=4)
+class Reservations(Revision):room_ids:list[str]=Field(max_length=4)
 
 
 @router.put("/reservations",dependencies=WRITE)
 def reservations(body:Reservations,user:Owner,db:DB):
     state=locked_state(db,body.revision);before=snapshot(db)
     eligible={r["id"] for r in before["resources"] if r["hotel_id"]=="wyndham" and r["category"]=="premium"}
-    if len(set(body.room_ids))!=4 or not set(body.room_ids).issubset(eligible):raise HTTPException(400,"Choose exactly four distinct Wyndham Premium rooms.")
+    if len(body.room_ids) not in [0,4] or len(set(body.room_ids))!=len(body.room_ids) or not set(body.room_ids).issubset(eligible):raise HTTPException(400,"Choose four distinct Premium rooms, or keep the unnamed four-room reserve pool.")
     for resource in db.scalars(select(Resource)):resource.reserved=resource.id in body.room_ids
     db.flush();verify_edit(db,before)
     return record(db,user,state,"reservations.updated",{"room_ids":sorted(body.room_ids)})
@@ -373,6 +379,10 @@ def apply_assignment(body:ApplyInput,user:Owner,db:DB):
     else:
         change=PlanChange(parent=state.cursor,actor_id=user.id,before=before,after=after);db.add(change);db.flush()
         state.cursor=change.id;state.redo=[]
+    if pending.payload.get('allocation_run'):
+        run=db.get(AllocationRun,uuid.UUID(pending.payload['allocation_run']))
+        if not run or run.owner_id!=user.id or run.status!='completed' or run.revision!=state.revision:raise HTTPException(409,"Allocation proposal changed; run again")
+        run.status='applied'
     save_assignments(db,after);db.delete(pending)
     return record(db,user,state,"assignment."+(direction or 'applied'),{"change_id":str(change.id),"warning_ids":sorted(expected)})
 
@@ -416,7 +426,6 @@ def queue_allocation(body:Revision,user:Owner,db:DB):
     state=locked_state(db,body.revision)
     if db.scalar(select(AllocationRun.id).where(AllocationRun.status.in_(["queued","running"]))):raise HTTPException(409,"An allocation job is already running.")
     data=snapshot(db)
-    if data["reserved_count"]!=4:raise HTTPException(409,"Choose the four reserved Premium rooms before automatic allocation.")
     # Solver input excludes contacts and private notes.
     for g in data["guests"]:g.pop("phone",None);g.pop("notes",None)
     run=AllocationRun(owner_id=user.id,revision=state.revision,snapshot=data,status="queued")
@@ -438,7 +447,10 @@ def list_runs(user:Owner,db:DB):
 def allocation_preview(run_id:uuid.UUID,body:Revision,user:Owner,db:DB):
     locked_state(db,body.revision);run=db.get(AllocationRun,run_id)
     if not run or run.status!="completed" or run.revision!=body.revision or not run.result or run.result.get("assignments") is None:raise HTTPException(409,"This proposal is unavailable or stale. Run allocation again.")
-    return preview_plan(db,user,body.revision,run.result["assignments"])
+    result=preview_plan(db,user,body.revision,run.result["assignments"])
+    if result.get('token'):
+        pending=db.get(PendingChange,uuid.UUID(result['token']));pending.payload={**pending.payload,'allocation_run':str(run.id)};db.commit()
+    return result
 
 
 class MealInput(Input):
@@ -507,19 +519,29 @@ class EventInput(Revision):
     name:str=Field(min_length=1,max_length=100)
     day:Literal['2026-11-24','2026-11-25','2026-11-26']
     side:Literal['bride','groom']|None=None
+    start_time:str|None=Field(default=None,pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
+    venue:str=Field(default="",max_length=150)
+    source_url:str=Field(default="",max_length=250)
+
+    @field_validator('source_url')
+    @classmethod
+    def source_https(cls,value):
+        if value and not value.startswith('https://'):raise ValueError('Use an https source link')
+        return value
 
 
 @router.post('/events',dependencies=WRITE,status_code=201)
 def add_event(body:EventInput,user:Owner,db:DB):
     state=locked_state(db,body.revision)
     if not body.name.strip():raise HTTPException(400,'Enter a function/event name')
-    event=FunctionEvent(name=body.name.strip(),day=date.fromisoformat(body.day),side=body.side);db.add(event);db.flush()
+    if db.scalar(select(FunctionEvent.id).where(FunctionEvent.name==body.name.strip(),FunctionEvent.day==date.fromisoformat(body.day),FunctionEvent.side==body.side)):raise HTTPException(409,'This function already exists for that date and side.')
+    event=FunctionEvent(**body.model_dump(exclude={'revision','day'}),day=date.fromisoformat(body.day));event.name=event.name.strip();db.add(event);db.flush()
     return {**record(db,user,state,'event.created',{'event_id':str(event.id)}),'id':str(event.id)}
 
 
 def event_data(db,user):
     data=visible_plan(db,user);ids={g['id'] for g in data['guests']}
-    events=[{'id':str(e.id),'name':e.name,'day':e.day.isoformat(),'side':e.side} for e in db.scalars(select(FunctionEvent).order_by(FunctionEvent.day,FunctionEvent.name)) if user.role!='family' or e.side is None or e.side==user.side]
+    events=[{'id':str(e.id),'name':e.name,'day':e.day.isoformat(),'side':e.side,'start_time':e.start_time,'venue':e.venue,'source_url':e.source_url} for e in db.scalars(select(FunctionEvent).order_by(FunctionEvent.day,FunctionEvent.start_time.asc().nullslast(),FunctionEvent.name)) if user.role!='family' or e.side is None or e.side==user.side]
     event_ids={e['id'] for e in events}
     rows=[{'event_id':str(a.event_id),'guest_id':str(a.guest_id),'planned':a.planned,'actual':a.actual} for a in db.scalars(select(EventAttendance)) if str(a.guest_id) in ids and str(a.event_id) in event_ids]
     return {'revision':data['revision'],'events':events,'rows':rows}
@@ -627,3 +649,50 @@ async def events(request:Request,user:Viewer):
             else:yield ': heartbeat\n\n'
             await asyncio.sleep(2)
     return StreamingResponse(stream(),media_type="text/event-stream",headers={"Cache-Control":"no-store","X-Accel-Buffering":"no"})
+
+
+class FamilyDetail(Input):
+    side:Literal['bride','groom']
+    name:str=Field(min_length=1,max_length=100)
+    relationship:str=Field(min_length=1,max_length=80)
+
+    @field_validator('name','relationship')
+    @classmethod
+    def nonblank(cls,value):
+        if not value.strip():raise ValueError('Enter a name and relationship')
+        return value.strip()
+
+
+class WeddingInput(Revision):
+    bride_name:str=Field(default='',max_length=100)
+    groom_name:str=Field(default='',max_length=100)
+    source_url:str=Field(default='',max_length=250)
+    family:list[FamilyDetail]=Field(default_factory=list,max_length=60)
+
+    @field_validator('source_url')
+    @classmethod
+    def source_https(cls,value):
+        if value and not value.startswith('https://'):raise ValueError('Use an https source link')
+        return value
+
+    @model_validator(mode='after')
+    def unique_people(self):
+        keys=[(p.side,p.name.casefold()) for p in self.family]
+        if len(keys)!=len(set(keys)):raise ValueError('Each family person belongs in the directory once')
+        return self
+
+
+@router.get('/wedding-details')
+def wedding_details(user:Viewer,db:DB):
+    state=db.get(PlanState,1);row=db.get(WeddingDetails,1)
+    data=copy.deepcopy(row.data) if row else {'bride_name':'','groom_name':'','source_url':'','family':[]}
+    if user.role=='family':data['family']=[p for p in data['family'] if p['side']==user.side]
+    return {'revision':state.revision,**data}
+
+
+@router.put('/wedding-details',dependencies=WRITE)
+def save_wedding_details(body:WeddingInput,user:Owner,db:DB):
+    state=locked_state(db,body.revision);row=db.get(WeddingDetails,1)
+    if not row:row=WeddingDetails(id=1);db.add(row)
+    row.data=body.model_dump(exclude={'revision'})
+    return record(db,user,state,'wedding.details_updated',{'family_count':len(body.family)})

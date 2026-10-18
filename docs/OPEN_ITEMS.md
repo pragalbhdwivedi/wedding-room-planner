@@ -4,7 +4,7 @@ These remain open as of the 19 October 2026 baseline. Do not invent answers. Mos
 
 | ID | Item | Required handling until resolved |
 | --- | --- | --- |
-| O01 | Four family Premium room numbers | Owner chooses exact numbers in Rooms & rules. All Premium placement waits for that selection; Superior manual placement remains possible. Automatic allocation waits for all four. |
+| O01 | Four family Premium room numbers | Owner chooses exact numbers later. In the meantime the confirmed four-room Premium reserve pool remains unused across both nights; other rooms can be assigned. |
 | O02 | Exact child physical ceiling and bedding quantity | Preserve allowed example of two adults plus two young children in Superior. Do not infer unlimited children or unlimited per-room adults from included bedding. Flag arrangements outside the known policy. |
 | O03 | Adult child of a couple / family of three adult-counted people | Couple-with-children Superior rule is confirmed, but edge semantics and physical constraints for larger families need validation. Keep conflicts visible; larger groups may need an owner-reviewed manual split. |
 | O04 | Corridor neighbours/opposite pairs, restaurant paths, stairs/lifts | Derive only defensible schematic positions; mark unverified relationships before relying on them as physical facts. |
@@ -20,8 +20,8 @@ These remain open as of the 19 October 2026 baseline. Do not invent answers. Mos
 | O14 | Backup destination, retention, recovery targets, data retention after event | Owner explicitly deferred backup work under D26. No scheduled backup or recovery verification is claimed. |
 | O15 | Guest names, ages, contacts, headcounts and relationship tags | Enter privately later. Never request or publish these in public issues. |
 | O16 | Public software licence | None selected. Do not add an open-source licence automatically. |
-| O17 | Named reservation rooms vs reservation-pool behaviour before selection | Logical holdback can preserve quantity, but exact physical assignment should wait for owner selection. |
+| O17 | Resolved pool behaviour; physical selection remains open | D35 authorises four unused Premium rooms across both nights. Exact family room numbers still await owner choice. |
 
 ## Explicitly deferred, not blocking the document baseline
 
-The planner's integration with the invitation/RSVP system is not part of an approved implementation scope yet. The core planning workflows are implemented. Physical and cost questions above remain explicit inputs; they are not silently resolved by a successful solver run. See STATUS.md for exact verification and deployment evidence.
+One-time invitation function/family transfer and theme reuse are now authorised. Automatic RSVP synchronisation remains outside the approved implementation scope. The core planning workflows are implemented. Physical and cost questions above remain explicit inputs; they are not silently resolved by a successful solver run. See STATUS.md for exact verification and deployment evidence.

@@ -1,0 +1,278 @@
+/* Palette and editorial type from the owner's invitation, kritica.in. */
+:root {
+  --green: #0d1a11;
+  --cream: #e7dbc2;
+  --gold: #caa566;
+  --border: #c9b991;
+  --muted: #6c6657;
+  --wine: #4b1f24;
+  --paper: #e7dbc2;
+  --ivory: #efe5ce;
+  --forest: #0d1a11;
+  --font-editorial: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  background: var(--paper);
+  color: #1a211a;
+}
+body {
+  background: var(--paper);
+}
+h1,
+h2,
+.planning-workspace h1,
+.planning-workspace h2 {
+  font-family: var(--font-editorial);
+}
+h1 {
+  letter-spacing: -0.035em;
+}
+.sidebar {
+  background: linear-gradient(155deg, #14271a, #09100b 75%);
+  color: var(--ivory);
+  border-right: 1px solid #caa56666;
+}
+.sidebar .brand {
+  color: var(--gold);
+}
+.brand-mark {
+  border-color: #caa56680;
+  color: var(--gold);
+  border-radius: 2px;
+}
+.nav-item {
+  color: #dfd6c0;
+}
+.nav-item.active,
+.nav-item:hover {
+  background: #caa56618;
+  color: #f1e4c8;
+  box-shadow: inset 2px 0 #caa566;
+}
+.sidebar-bottom {
+  border-color: #caa56640;
+}
+.sidebar-bottom strong {
+  color: #efe5ce;
+}
+.sidebar-bottom small {
+  color: #c8bfa9;
+}
+.main-content,
+.workspace-content {
+  background: var(--paper);
+}
+.topbar {
+  border-color: #caa56666;
+  background: #efe5ce;
+}
+.page-heading {
+  border-bottom: 1px solid #caa56677;
+  padding-bottom: 20px;
+}
+.eyebrow {
+  color: #806c46;
+  letter-spacing: 2px;
+}
+.planning-workspace h1 {
+  color: #14271a;
+}
+.primary {
+  background: var(--forest);
+  border-color: #806c46;
+  color: var(--ivory);
+  border-radius: 3px;
+}
+.primary:hover {
+  background: #344329;
+}
+.secondary {
+  border-color: #b8a680;
+  background: #f4ecdb;
+  color: #283525;
+  border-radius: 3px;
+}
+.secondary:hover {
+  background: #e4d5b7;
+}
+input,
+select,
+textarea,
+.search-box,
+.small-field select {
+  background-color: #fbf7ee;
+  border-color: #c9b991;
+  border-radius: 3px;
+  color: #283525;
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: 2px solid #806c46;
+  outline-offset: 3px;
+}
+.settings-card,
+.planner-summary,
+.guest-drawer,
+.room-drawer,
+.planning-dialog,
+.modal {
+  background: #f4ecdb;
+  border-color: #c9b991;
+}
+.canvas-caption,
+.planner-summary h2 {
+  border-color: #caa56666;
+}
+.all-room-grid,
+.flow-canvas {
+  background: linear-gradient(135deg, #e7dbc2, #efe5ce);
+}
+.plan-room {
+  border-radius: 3px;
+  border-color: #c5b58f;
+  background: #faf4e7;
+  box-shadow: 0 3px 10px #09100b0c;
+}
+.plan-room.bride {
+  background: #f4e7e4;
+  border-left-color: #923f50;
+}
+.plan-room.groom {
+  background: #e6ebdf;
+  border-left-color: #477057;
+}
+.plan-room.mixed {
+  background: #eee4ef;
+}
+.side-dot.bride {
+  background: #923f50;
+}
+.side-dot.groom {
+  background: #477057;
+}
+.side-text.bride {
+  color: #813447;
+}
+.side-text.groom {
+  color: #31583e;
+}
+.plan-room.reserved {
+  background: #efe2bd;
+  border-color: #a78a4d;
+}
+.auth-story {
+  background: linear-gradient(145deg, #14271a, #09100b);
+  color: var(--ivory);
+}
+.auth-form-area {
+  background: var(--paper);
+}
+.auth-card h2 {
+  color: var(--forest);
+}
+.wedding-context .section-heading {
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.wedding-context h2 {
+  margin-top: 8px;
+}
+.wedding-context > p {
+  margin: 12px 0 22px;
+}
+.wedding-family-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+}
+.wedding-family-columns h3 {
+  color: var(--wine);
+  font-family: var(--font-editorial);
+  font-size: 24px;
+  border-bottom: 1px solid #caa56688;
+  padding-bottom: 10px;
+}
+.wedding-family-columns dl {
+  margin: 0;
+}
+.wedding-family-columns dl > div {
+  padding: 12px 0;
+  border-bottom: 1px solid #caa56644;
+}
+.wedding-family-columns dt {
+  color: #74613e;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+}
+.wedding-family-columns dd {
+  margin: 5px 0 0;
+  font-size: 15px;
+  color: #283525;
+}
+.wedding-detail-form > label {
+  margin: 16px 0;
+}
+.family-detail-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 1fr auto;
+  gap: 12px;
+  border: 1px solid #c9b991;
+  margin: 16px 0;
+  padding: 16px;
+  min-width: 0;
+}
+.family-detail-row input {
+  min-width: 0;
+  width: 100%;
+}
+.family-detail-row legend {
+  color: #806c46;
+  font-size: 11px;
+}
+.function-timeline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+  margin: 24px 0;
+}
+.function-timeline article {
+  border: 1px solid #c9b991;
+  border-top: 3px solid #806c46;
+  padding: 20px;
+  background: #fbf7ee;
+}
+.function-timeline h3 {
+  font-family: var(--font-editorial);
+  color: var(--wine);
+  font-size: 23px;
+  margin: 12px 0;
+}
+.function-timeline a {
+  font-size: 11px;
+  color: #6d5630;
+}
+@media (max-width: 700px) {
+  .wedding-family-columns {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .family-detail-row {
+    grid-template-columns: 1fr;
+  }
+  .function-timeline {
+    grid-template-columns: 1fr;
+  }
+  .wedding-detail-form .form-row {
+    flex-direction: column;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

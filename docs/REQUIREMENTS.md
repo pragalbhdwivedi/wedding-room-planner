@@ -101,4 +101,9 @@ Subsequent owner instruction: expose the preview on the local network so other L
 
 The supported child examples are retained; larger young-child arrangements remain unresolved under O02 rather than becoming an invented hotel policy. The first allocator uses whole-family units and bounded search. It may leave oversized families or unknown ages unassigned for manual review. Neither a solver proposal nor an estimate is applied/finalised automatically. Actual arrival/departure, function attendance and meal attendance are independent records. One person cannot be counted for the same meal at two locations on the same attendance basis.
 
-General Premium allocation is blocked until the owner chooses the four reserved Premium rooms. Exact physical restaurant/neighbour relationships remain owner-confirmed inputs. The six secondary room numbers are internal placeholders until privately supplied.
+Until exact family-room numbers are chosen, keep four Premium rooms unused as an unnamed reserve across both nights; allocation may use the remaining inventory. Supplied adult/child counts may drive an explicitly provisional draft when exact ages are missing. Do not invent ages; display pending-age/accessibility review, and enforce age-50+ ground floor as soon as an exact age is supplied. Exact physical restaurant/neighbour relationships remain owner-confirmed inputs. The six secondary room numbers are internal placeholders until privately supplied.
+
+
+## R14 - Invitation context and visual theme
+
+The owner requested function and family details from their invitation site and the same visual theme. Store the couple/family directory privately, with source provenance and own-side family visibility; directory entries do not create overnight guests. Functions retain date, local Asia/Kolkata time, venue and source link. Do not infer attendance, meals, ages or reservations from invitation membership. Reuse the invitation's forest, wine, gold and paper palette and editorial typography while supporting both laptop and phone planning. This is a one-time assisted content transfer, not automatic RSVP synchronisation.

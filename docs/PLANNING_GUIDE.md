@@ -4,15 +4,15 @@ Only your owner login can change this plan. Family viewers see their own side; r
 
 ## 1. Enter people privately
 
-Open **Guests & families → Add guests**. Make one slot for every person, including children, and choose the side, category and planned arrival. Blank names and ages are allowed for preparation; complete those same slots later rather than adding them again. Assignment needs an age. Choose **Non-resident / event only** for people who attend without staying.
+Open **Guests & families → Add guests**. Make one slot for every person, including children, and choose the side, category and planned arrival. Blank names and ages are allowed for preparation; complete those same slots later rather than adding them again. For a provisional assignment, select Adult (>10) or Child (<=10) when the exact age is pending. Never enter an invented age. Confirm exact ages and age-50+ accessibility before finalising. Choose **Non-resident / event only** for people who attend without staying.
 
 Use **Couple with children** for the Superior-room rule and **Eligible for reserved family rooms** only for people allowed in the four family rooms. Built-in tags cover ground floor, restaurant proximity and the second hotel; extra text tags can target conditional rules. An age of 50 or above independently requires ground floor. Staff, drivers and vendors use the separate dormitory, never guest rooms.
 
 ## 2. Reserve family rooms and verify topology
 
-In **Rooms & rules**, select exactly four Premium rooms. They are excluded from general placement. Premium assignment and automatic allocation wait for this choice. The other 40 Wyndham rooms are general inventory.
+In **Rooms & rules**, select exactly four Premium rooms. They are excluded from general placement. Alternatively keep the four-room Premium reserve pool until you choose the numbers; four Premium rooms must remain unused across both nights. The other 40 Wyndham rooms are general inventory.
 
-The planner opens on one block and ground floor for readability. Switch property/block/floor to see other rooms and all 12 staff beds. **Edit layout** moves room cards and saves their schematic coordinates. It does not establish real corridor proximity. Add confirmed neighbouring/opposite connections and mark a room near the restaurant only when you know those facts. The second hotel's six initial room labels are explicitly unnumbered placeholders.
+The planner opens on all 44 Wyndham rooms in a scrollable grid. Switch to Topology for the schematic canvas, or filter by property/block/floor. The second hotel and 12 staff beds remain separate inventories. **Edit layout** moves room cards and saves their schematic coordinates. It does not establish real corridor proximity. Add confirmed neighbouring/opposite connections and mark a room near the restaurant only when you know those facts. The second hotel's six initial room labels are explicitly unnumbered placeholders.
 
 ## 3. Place and arrange
 
@@ -24,9 +24,9 @@ The right panel distinguishes actual heads, Wyndham's 44 rooms, the six secondar
 
 ## 4. Suggest an initial plan
 
-Choose **Suggest rooms** after reserving four Premium rooms. The worker leaves your current plan in place. Review the resulting proposal, any unresolved people, exact proposed moves and the resulting known estimate, then apply it explicitly.
+Choose **Suggest rooms** with either four named Premium reservations or the four-room unnamed reserve pool. The worker leaves your current plan in place. Review the resulting proposal, any unresolved people, exact proposed moves and the resulting known estimate, then apply it explicitly.
 
-The initial solver keeps families together as units, preserves locks, enforces eligibility/compatibility, and searches for up to 10 seconds. It supports up to 300 resident people; guest entry/import supports 1,000 total slots. A large family may need a reviewed manual split. Unknown ages, unknown accessibility facts or child arrangements outside the supported examples remain unresolved. A feasible result is not a guarantee of a globally best plan; the result labels its search status.
+The initial solver keeps families together as units, preserves locks, enforces eligibility/compatibility, and searches for up to 10 seconds. It supports up to 300 resident people; guest entry/import supports 1,000 total slots. A large family may need a reviewed manual split. An explicit adult/child band allows a provisional draft without an exact age; completely unknown bands and child arrangements outside the supported examples remain unresolved. Pending ages/accessibility are shown for review. A feasible result is not a guarantee of a globally best plan; the result labels its search status.
 
 Use typed conditional rules for allowed rooms by side/tag, a side room maximum, and side separation by room/block/floor. Add pair relationships for explicit sharing, must-share, cannot-share, nearby or same-building requests. Rule text is a label, not executable code.
 
@@ -47,3 +47,8 @@ Download the owner template or export your current plan. Import only the **Guest
 Other sessions refresh live; stale writes/previews are rejected. Review again after another change. There is no offline-editing mode. All actual guest information stays in the private database and exports, outside the public repository.
 
 Trusted HTTPS, backup/restore work and owner acceptance remain tracked separately in STATUS.md and OPEN_ITEMS.md.
+
+
+## 7. Invitation context
+
+**Arrivals & functions** also holds the couple and family directory. Only the owner edits it; family viewers receive their own side. These details never create guest slots or increase resident counts. Keep real guests in the accommodation roster separately and reuse stable IDs when completing names. Functions can include local Asia/Kolkata times (00:00 belongs to its selected date), venue and an https source link. Repeated function names on the same date/side are rejected. Invitation content does not mark anyone attending or charge meals.
