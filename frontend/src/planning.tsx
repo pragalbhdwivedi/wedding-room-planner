@@ -254,6 +254,7 @@ function RoomNode({ data }: { data: RoomData }) {
       className={`plan-room ${side} ${r.reserved ? "reserved" : ""} ${data.selected && data.allowed !== undefined ? (data.allowed ? "can-place" : "cannot-place") : ""}`}
       title={data.reason || undefined}
       role="button"
+      data-room-id={r.id}
       tabIndex={0}
       aria-label={`${r.hotel_id === "staff" ? "Dormitory" : "Room"} ${roomName(r)}, ${data.people.length} assigned${r.reserved ? ", reserved for family" : ""}${data.locked ? ", locked" : ""}`}
       onKeyDown={(e) => {
@@ -411,6 +412,51 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
   }
   const upload = useRef<HTMLInputElement>(null),
     revisionRef = useRef(0);
+  const pointerDrag = useRef<{
+      ids: string[];
+      x: number;
+      y: number;
+      moved: boolean;
+    } | null>(null),
+    dragFinished = useRef(0);
+  function beginDrag(e: React.PointerEvent, ids: string[]) {
+    if (!owner || e.pointerType !== "mouse" || e.button !== 0 || !ids.length)
+      return;
+    pointerDrag.current = { ids, x: e.clientX, y: e.clientY, moved: false };
+    setSelection(ids);
+    setSwapFrom(null);
+  }
+  useEffect(() => {
+    const track = (e: PointerEvent) => {
+      const drag = pointerDrag.current;
+      if (drag && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8)
+        drag.moved = true;
+    };
+    const finish = (e: PointerEvent) => {
+      const drag = pointerDrag.current;
+      pointerDrag.current = null;
+      if (!drag?.moved) return;
+      const target = document
+        .elementFromPoint(e.clientX, e.clientY)
+        ?.closest("[data-room-id]");
+      const id = target?.getAttribute("data-room-id");
+      if (id) {
+        dragFinished.current = Date.now();
+        move(drag.ids, id);
+      }
+    };
+    const cancel = () => {
+      pointerDrag.current = null;
+    };
+    window.addEventListener("pointermove", track);
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", cancel);
+    return () => {
+      window.removeEventListener("pointermove", track);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", cancel);
+    };
+  }, [data?.revision, night, owner]);
   const request = useCallback(
     async (path: string, options: RequestInit = {}) => {
       const multipart = options.body instanceof FormData;
@@ -549,6 +595,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
     if (result) openPreview(result);
   }
   async function chooseRoom(r: Resource) {
+    if (Date.now() - dragFinished.current < 250) return;
     if (layoutMode) {
       setDetails(r);
       return;
@@ -782,11 +829,8 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
       <button
         key={g.id}
         className={"guest-choice " + (selection.includes(g.id) ? "chosen" : "")}
-        draggable={owner && occupied(g, night)}
-        onDragStart={(e) => {
-          setSelection([g.id]);
-          e.dataTransfer.setData("application/wedding-guests", g.id);
-        }}
+        draggable={false}
+        onPointerDown={(e) => occupied(g, night) && beginDrag(e, [g.id])}
         onClick={() => owner && occupied(g, night) && selectGuests([g.id])}
       >
         <span className={"side-dot " + g.side} />
@@ -1626,14 +1670,13 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                             "guest-choice group-choice " +
                             (chosen ? "chosen" : "")
                           }
-                          draggable={owner}
-                          onDragStart={(e) => {
-                            setSelection(members.map((g) => g.id));
-                            e.dataTransfer.setData(
-                              "application/wedding-guests",
-                              members.map((g) => g.id).join(","),
-                            );
-                          }}
+                          draggable={false}
+                          onPointerDown={(e) =>
+                            beginDrag(
+                              e,
+                              members.map((g) => g.id),
+                            )
+                          }
                           onClick={() =>
                             owner && selectGuests(members.map((g) => g.id))
                           }
