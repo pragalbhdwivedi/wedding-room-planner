@@ -445,3 +445,24 @@ def test_function_times_sources_duplicate_guard_and_excel(client,owner):
     assert event['day']=='2026-11-26' and event['start_time']=='00:00'
     wb=load_workbook(io.BytesIO(client.get('/api/planning/export.xlsx').content))
     assert wb['Functions']['E2'].value=='00:00' and wb['Functions']['F2'].value=='Synthetic venue'
+
+
+def test_excel_optional_or_stale_dimensions_remain_bounded(client,owner):
+    import re,zipfile
+    from app.spreadsheet_api import parse_import
+    def content(rows=1,far_column=False,dimension=None):
+        wb=Workbook();sheet=wb.active;sheet.title='Guests';sheet.append(HEADERS)
+        for i in range(rows):sheet.append([None,None,'Synthetic Import','bride',False,False,'Synthetic '+str(i),30,'guest',None,NIGHTS[0],'','', 'adult'])
+        if far_column:sheet['AA2']='Synthetic excess column'
+        out=io.BytesIO();wb.save(out);changed=io.BytesIO()
+        with zipfile.ZipFile(io.BytesIO(out.getvalue())) as source,zipfile.ZipFile(changed,'w',zipfile.ZIP_DEFLATED) as target:
+            for item in source.infolist():
+                data=source.read(item.filename)
+                if item.filename=='xl/worksheets/sheet1.xml':data=re.sub(rb'<dimension[^>]*/>',dimension or b'',data)
+                target.writestr(item,data)
+        return changed.getvalue()
+    current=plan(client)
+    payload,errors,warnings=parse_import(content(),current);assert not errors and not warnings and len(payload['guests'])==1
+    for invalid in [content(1001),content(far_column=True),content(1001,dimension=b'<dimension ref="A1:A1"/>')]:
+        with pytest.raises(Exception) as caught:parse_import(invalid,current)
+        assert caught.value.status_code==400 and '1,000' in caught.value.detail
