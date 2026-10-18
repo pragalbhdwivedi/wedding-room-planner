@@ -4,7 +4,7 @@ from itertools import combinations
 
 from ortools.sat.python import cp_model
 
-from .planning_rules import NIGHTS, STAFF, active, building, capacity_ok, compatible, is_adult, matches, resource_issues, segment, validate
+from .planning_rules import NIGHTS, STAFF, active, building, capacity_ok, compatible, friend_rosters, is_adult, matches, resource_issues, segment, validate
 
 
 def allocate(data,time_limit=10):
@@ -16,9 +16,9 @@ def allocate(data,time_limit=10):
         while parent[g]!=g:parent[g]=parent[parent[g]];g=parent[g]
         return g
     def union(a,b):parent[root(a)]=root(b)
-    families=defaultdict(list)
+    families=defaultdict(list);rosters=friend_rosters(data)
     for g in guests.values():
-        if g["category"]=="guest":families[g["family_id"]].append(g["id"])
+        if g["category"]=="guest" and g["family_id"] not in rosters:families[g["family_id"]].append(g["id"])
     for members in families.values():
         for member in members[1:]:union(members[0],member)
     for link in data["links"]:

@@ -11,6 +11,8 @@ Status: acceptance plan; actual results are recorded separately in STATUS.md. Us
 | A05 | Couple plus two children <=10 | Allowed in a Superior room with bedding under owner policy. Actual heads show four; adult-counted occupancy stays separate. Premium allocation raises the applicable family-placement issue. |
 | A06 | Superior with four adult-counted people | Capacity conflict visible; included bedding does not silently remove the adult-counted limit. Larger young-child arrangements outside known policy are flagged unresolved. |
 | A07 | Age 49, age 50, younger guest tagged ground floor | Default age 49 is not automatically forced to ground; age 50 and tagged younger guest require ground. Ground-floor shortage is explained. |
+| A07a | Enter age 50 for a provisionally assigned upstairs guest | Owner sees the exact guest detail and proposed ground-floor room changes; cancelling keeps the form; applying saves both atomically. Locked or unavailable rooms are explained without losing entered details. |
+| A07b | Tick tags, choose gender, assign Friends | Owner can tick existing/add custom tags and select male, female or unspecified. Automatic allocation combines only same-gender adult Friends on the same side; unspecified genders stay separate, couples/linked children stay together, and mandatory exclusions win. |
 | A08 | Neighbouring and opposite-room request | Only verified room relationships fulfil the request; nearby canvas coordinates alone do not. |
 | A09 | Second-hotel eligible and ineligible people | Only tagged eligible guests may be auto-assigned there, including on first run. |
 | A10 | Guest in dorm / worker in regular room | Both changes blocked, even with override confirmation. Thirteenth dorm occupant produces a capacity conflict. |

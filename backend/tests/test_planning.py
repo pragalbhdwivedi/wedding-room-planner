@@ -102,6 +102,7 @@ def test_scope_no_cost_contact_or_mutation_leak(client,owner,role,side):
     assert viewer.get('/api/planning/allocation').status_code==403
     assert viewer.get('/api/planning/billing/snapshots').status_code==403
     assert viewer.post('/api/planning/families',json={'revision':d['revision'],'label':'Cannot Edit','side':'bride','members':[member()]},headers=h).status_code==403
+    assert viewer.post('/api/planning/families/apply',json={'revision':d['revision'],'token':'00000000-0000-0000-0000-000000000001'},headers=h).status_code==403
     assert viewer.put('/api/planning/reservations',json={'revision':d['revision'],'room_ids':['w-101','w-103','w-201','w-203']},headers=h).status_code==403
     assert viewer.post('/api/planning/assignments/preview',json={'revision':d['revision'],'moves':[{'guest_id':bride[0]['id'],'night':NIGHTS[0],'resource_id':'w-104'}]},headers=h).status_code==403
     if role=='family':
@@ -385,7 +386,8 @@ def test_known_age_bands_enable_provisional_assignment_without_invented_ages(cli
     assign(client,owner,other,'w-202')
     f=next(f for f in plan(client)['families'] if f['id']==other[0]['family_id'])
     body={**f,'revision':revision(client),'members':[{**member(None,50,age_band='adult'),'id':other[0]['id']}]};body.pop('id')
-    assert client.put('/api/planning/families/'+f['id'],json=body,headers=headers(owner)).status_code==409
+    repair=client.put('/api/planning/families/'+f['id'],json=body,headers=headers(owner));assert repair.status_code==200 and repair.json()['family_edit']
+    assert next(g for g in plan(client)['guests'] if g['id']==other[0]['id'])['age'] is None
     bad={**body,'revision':revision(client),'members':[{**member(None,10,age_band='adult'),'id':other[0]['id']}]}
     assert client.put('/api/planning/families/'+f['id'],json=bad,headers=headers(owner)).status_code==422
 
@@ -466,3 +468,94 @@ def test_excel_optional_or_stale_dimensions_remain_bounded(client,owner):
     for invalid in [content(1001),content(far_column=True),content(1001,dimension=b'<dimension ref="A1:A1"/>')]:
         with pytest.raises(Exception) as caught:parse_import(invalid,current)
         assert caught.value.status_code==400 and '1,000' in caught.value.detail
+
+
+def edit_body(client,people,**overrides):
+    data=plan(client);fid=people[0]['family_id'];f=next(f for f in data['families'] if f['id']==fid)
+    keys=['id','name','age','age_band','gender','sharing_mode','category','phone','arrival','tags','notes']
+    return {**{k:v for k,v in f.items() if k!='id'},'revision':data['revision'],'members':[{k:g[k] for k in keys} for g in data['guests'] if g['family_id']==fid],**overrides}
+
+
+def test_friend_gender_combining_and_unknowns_keep_separate(client,owner):
+    for i,(gender,side) in enumerate([('male','bride'),('male','bride'),('female','bride'),('female','bride'),('unspecified','bride'),('unspecified','bride'),('male','groom'),('male','groom')]):
+        family(client,owner,[member('Synthetic Friend '+str(i),gender=gender,sharing_mode='friends')],label='Synthetic Group '+str(i),side=side)
+    with SessionLocal() as db:data=snapshot(db)
+    result=allocate(data,3);assert result['assignments'] and len(result['assignments'])==16 and not result['unassigned']
+    for night in NIGHTS:
+        rows=[r for r in result['assignments'] if r['night']==night];assert len({r['resource_id'] for r in rows})==5
+        for rid in {r['resource_id'] for r in rows}:
+            people=[g for g in data['guests'] if any(r['resource_id']==rid and r['guest_id']==g['id'] for r in rows)]
+            if len(people)>1:assert len({(g['gender'],g['side']) for g in people})==1 and people[0]['gender']!='unspecified'
+    assert not validate(data,result['assignments'])['errors']
+
+
+def test_friends_roster_can_split_by_gender_and_exclusions_win(client,owner):
+    friends=family(client,owner,[member('Synthetic Friend A',gender='male',sharing_mode='friends'),member('Synthetic Friend B',gender='female',sharing_mode='friends')])
+    wrong=preview(client,owner,friends,'w-101');assert any(e['code']=='compatibility' for e in wrong['errors'])
+    other=family(client,owner,[member('Synthetic Friend C',gender='male',sharing_mode='friends')],label='Synthetic Other Friend')
+    male=next(g for g in friends if g['gender']=='male')
+    response=client.post('/api/planning/links',json={'revision':revision(client),'a':male['id'],'b':other[0]['id'],'kind':'cannot_share','severity':'hard'},headers=headers(owner));assert response.status_code==200
+    with SessionLocal() as db:data=snapshot(db)
+    result=allocate(data,3);assert result['assignments'] and len(result['assignments'])==6
+    assert not validate(data,result['assignments'])['warnings']
+    for n in NIGHTS:
+        rooms={r['guest_id']:r['resource_id'] for r in result['assignments'] if r['night']==n};assert rooms[male['id']]!=rooms[other[0]['id']]
+
+
+def test_age_edit_reviews_atomic_ground_floor_repair_for_whole_household(client,owner):
+    people=family(client,owner,[member(None,None,age_band='adult'),member(None,None,age_band='adult')])
+    for n in NIGHTS:assign(client,owner,people,'w-202',n)
+    original=plan(client)['assignments'];body=edit_body(client,people);body['members'][0]['age']=50
+    response=client.put('/api/planning/families/'+people[0]['family_id'],json=body,headers=headers(owner));assert response.status_code==200,response.text
+    p=response.json();assert p['family_edit'] and not p['errors'] and len(p['changes'])==4
+    assert plan(client)['assignments']==original and all(g['age'] is None for g in plan(client)['guests'])
+    response=client.post('/api/planning/families/apply',json={'revision':p['revision'],'token':p['token'],'acknowledged':[w['id'] for w in p['warnings']]},headers=headers(owner));assert response.status_code==200,response.text
+    data=plan(client);resources={r['id']:r for r in data['resources']}
+    assert len(data['guests'])==2 and sum(g['age']==50 for g in data['guests'])==1
+    assert all(resources[a['resource_id']]['floor']==0 for a in data['assignments'])
+    assert len({a['resource_id'] for a in data['assignments']})==1 and not data['conflicts']['errors']
+    assert client.post('/api/planning/families/apply',json={'revision':revision(client),'token':p['token']},headers=headers(owner)).status_code==409
+
+
+def test_age_repair_preserves_locks_and_stale_preview_is_nonmutating(client,owner):
+    people=family(client,owner,[member(None,None,age_band='adult')]);assign(client,owner,people,'w-202')
+    body=edit_body(client,people);body['members'][0]['age']=50
+    p=client.put('/api/planning/families/'+people[0]['family_id'],json=body,headers=headers(owner)).json();assert p['family_edit']
+    locked=client.put('/api/planning/locks',json={'revision':revision(client),'resource_id':'w-202','night':NIGHTS[0],'locked':True},headers=headers(owner));assert locked.status_code==200
+    assert client.post('/api/planning/families/apply',json={'revision':revision(client),'token':p['token']},headers=headers(owner)).status_code==409
+    body['revision']=revision(client);response=client.put('/api/planning/families/'+people[0]['family_id'],json=body,headers=headers(owner));assert response.status_code==409 and 'lock' in response.text.lower()
+    assert plan(client)['guests'][0]['age'] is None and plan(client)['assignments'][0]['resource_id']=='w-202'
+
+
+def test_age_repair_no_room_can_save_unassigned_and_warning_ack_is_exact(client,owner):
+    people=family(client,owner,[member(None,None,age_band='adult')]);assign(client,owner,people,'w-202')
+    with SessionLocal() as db:
+        from app.models import RoomLock
+        for r in snapshot(db)['resources']:
+            if r['floor']==0:db.add(RoomLock(resource_id=r['id'],night=NIGHTS[0]))
+        db.commit()
+    body=edit_body(client,people);body['members'][0]['age']=50
+    p=client.put('/api/planning/families/'+people[0]['family_id'],json=body,headers=headers(owner)).json();assert p['family_edit'] and p['changes'][0]['to'] is None
+    response=client.post('/api/planning/families/apply',json={'revision':p['revision'],'token':p['token'],'acknowledged':[]},headers=headers(owner));assert response.status_code==200
+    assert plan(client)['guests'][0]['age']==50 and not plan(client)['assignments']
+    # A requested restaurant preference stays an explicit warning, not an implicit override.
+    young=family(client,owner,[member('Synthetic Young Guest',30)],label='Synthetic Other Household');assign(client,owner,young,'w-204')
+    body=edit_body(client,young);body['members'][0]['tags']=['near_restaurant'];p=client.put('/api/planning/families/'+young[0]['family_id'],json=body,headers=headers(owner)).json()
+    assert p['family_edit'] and p['warnings']
+    response=client.post('/api/planning/families/apply',json={'revision':p['revision'],'token':p['token'],'acknowledged':[]},headers=headers(owner));assert response.status_code==409
+    assert next(g for g in plan(client)['guests'] if g['id']==young[0]['id'])['tags']==[]
+
+
+def test_gender_friend_excel_roundtrip_and_older_client_preservation(client,owner):
+    people=family(client,owner,[member('Synthetic Friend',gender='female',sharing_mode='friends')])
+    exported=client.get('/api/planning/export.xlsx').content
+    wb=load_workbook(io.BytesIO(exported));header=list(next(wb['Guests'].values));row=list(wb['Guests'].values)[1]
+    assert row[header.index('Gender')]=='female' and row[header.index('Sharing mode')]=='friends'
+    from app.spreadsheet_api import parse_import
+    with SessionLocal() as db:reimport,errors,warnings=parse_import(exported,snapshot(db))
+    assert not errors and not warnings and reimport['guests'][0]['gender']=='female' and reimport['guests'][0]['sharing_mode']=='friends'
+    body=edit_body(client,people)
+    for g in body['members']:g.pop('gender');g.pop('sharing_mode')
+    assert client.put('/api/planning/families/'+people[0]['family_id'],json=body,headers=headers(owner)).status_code==200
+    assert plan(client)['guests'][0]['gender']=='female' and plan(client)['guests'][0]['sharing_mode']=='friends'
+    invalid=member(gender='guessed');response=client.post('/api/planning/families',json={'revision':revision(client),'label':'Synthetic Invalid','side':'bride','members':[invalid]},headers=headers(owner));assert response.status_code==422

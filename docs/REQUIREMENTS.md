@@ -24,12 +24,15 @@ Build a private web-based room-allocation application inside Docker. Support pho
 - Support named individuals, family headcounts, and later completion of names and ages. Do not double-count a family when its named members are entered.
 - Couples and linked children should stay together. Splitting a family must produce a warning.
 - Unrelated adults may share only when explicitly marked compatible.
+- Let the owner choose male, female, or unspecified for each guest and mark guests as Friends. Initial allocation may combine adult Friends of the same selected gender and the same bride/groom side, subject to room capacity and explicit exclusions. Unspecified gender is not a match. Couples and linked children remain together.
 - Support must-share, may-share, must-not-share, nearby-room, same-building, and separation relationships, with rule severity recorded explicitly.
 
 ## R04 - Placement and tags
 
 - Use actual building/floor placement from the supplied structural inventory.
 - Age 50 and above automatically requires ground floor. An individual tag may also require ground floor for a younger guest.
+- When an owner adds an age or tag that makes an existing upstairs placement invalid, show the required ground-floor placement change for review and apply the guest edit and placement together. Preserve the entered form while reviewing. Explain when locks or room availability prevent a safe move.
+- Allow the owner to tick available tags and add a custom tag for each guest.
 - Restaurant proximity is a preference. "Kitchen" in earlier discussion means restaurant.
 - A room counts as nearby when directly neighbouring or opposite across a corridor. Actual adjacency needs confirmation; canvas proximity alone is not evidence.
 - Bride/groom building/floor separation, quotas, mixed/shared groups, and other arrangements should be configurable through tags and rules, not fixed global assumptions.

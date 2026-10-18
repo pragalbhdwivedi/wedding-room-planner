@@ -1,3 +1,4 @@
+import { TagPicker } from "./tag-picker";
 import { WeddingDetailsPanel } from "./wedding-details";
 import React, {
   useCallback,
@@ -58,6 +59,8 @@ type Guest = {
   age: number | null;
   age_band?: "adult" | "child" | "unknown";
   group_label?: string;
+  gender?: "male" | "female" | "unspecified";
+  sharing_mode?: "family" | "friends";
   category: string;
   phone?: string | null;
   arrival: string | null;
@@ -120,6 +123,9 @@ type Preview = {
   families?: number;
   guests?: number;
   importing?: boolean;
+  family_edit?: boolean;
+  reason?: string;
+  edited_guests?: Guest[];
   changes?: {
     guest_id: string;
     night: string;
@@ -150,13 +156,21 @@ const dayName = (s: string) =>
 const roomName = (r: Resource) =>
   r.number || `Unnumbered · ${r.id.replace("second-", "")}`;
 const guestName = (g?: Guest) =>
-  !g ? "Guest no longer listed" : g.name ||
-  `${g.group_label || "Unnamed guest"} · ${g.age_band === "adult" ? "Adult" : g.age_band === "child" ? "Child" : "Guest"} ${g.tags.find((t) => t.startsWith("slot_"))?.slice(5) || g.id.slice(0, 4)}`;
+  !g
+    ? "Guest no longer listed"
+    : g.name ||
+      `${g.group_label || "Unnamed guest"} · ${g.age_band === "adult" ? "Adult" : g.age_band === "child" ? "Child" : "Guest"} ${g.tags.find((t) => t.startsWith("slot_"))?.slice(5) || g.id.slice(0, 4)}`;
+const guestCategory = (g: Guest) =>
+  g.category === "guest" && g.sharing_mode === "friends"
+    ? `Friends · ${g.gender === "unspecified" || !g.gender ? "gender pending" : g.gender}`
+    : g.category;
 const occupied = (g: Guest, n: string) => !!g.arrival && g.arrival <= n;
 const emptyMember = () => ({
   name: "",
   age: "",
   age_band: "unknown",
+  gender: "unspecified",
+  sharing_mode: "family",
   category: "guest",
   phone: "",
   arrival: nights[0],
@@ -790,6 +804,8 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
               ? "adult"
               : "child",
         category: g.category,
+        gender: g.gender || "unspecified",
+        sharing_mode: g.sharing_mode || "family",
         phone: g.phone || null,
         arrival: g.arrival || null,
         tags: g.tags
@@ -804,7 +820,9 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
       payload,
       d.id ? "PUT" : "POST",
     );
-    if (result) {
+    if (result?.family_edit) {
+      openPreview(result);
+    } else if (result) {
       setFamilyDraft(null);
       setNotice(
         "Guest slots saved. Names and ages complete the same people without duplicating them.",
@@ -814,10 +832,15 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
   async function confirmPreview() {
     if (!preview?.token) return;
     const result = await action(
-      preview.importing ? "/import/apply" : "/assignments/apply",
+      preview.importing
+        ? "/import/apply"
+        : preview.family_edit
+          ? "/families/apply"
+          : "/assignments/apply",
       { revision: preview.revision, token: preview.token, acknowledged: acks },
     );
     if (result) {
+      if (preview.family_edit) setFamilyDraft(null);
       setPreview(null);
       setSelection([]);
       setNotice(
@@ -1499,7 +1522,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                               {g.arrival ? dayName(g.arrival) : "Event only"}
                             </td>
                             <td>
-                              {g.category}
+                              {guestCategory(g)}
                               <small>{g.tags.join(", ") || "No tags"}</small>
                             </td>
                             {user.role !== "family" && (
@@ -2483,7 +2506,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                       <tr key={g.id}>
                         <td>
                           <b>{guestName(g)}</b>
-                          <small>{g.category}</small>
+                          <small>{guestCategory(g)}</small>
                         </td>
                         <td>
                           <input
@@ -2579,7 +2602,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
           </section>
         </>
       )}
-      {familyDraft && (
+      {familyDraft && !preview?.family_edit && (
         <Dialog
           title={familyDraft.id ? "Edit family / group" : "Add guests"}
           close={() => setFamilyDraft(null)}
@@ -2699,12 +2722,61 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                       <label>
                         Category
                         <select
-                          value={g.category}
-                          onChange={(e) => edit("category", e.target.value)}
+                          value={
+                            g.category === "guest" &&
+                            g.sharing_mode === "friends"
+                              ? "friends"
+                              : g.category
+                          }
+                          onChange={(e) => {
+                            edit(
+                              "category",
+                              e.target.value === "friends"
+                                ? "guest"
+                                : e.target.value,
+                            );
+                            edit(
+                              "sharing_mode",
+                              e.target.value === "friends"
+                                ? "friends"
+                                : "family",
+                            );
+                            edit(
+                              "tags",
+                              g.tags
+                                .split(",")
+                                .map((t: string) => t.trim())
+                                .filter((t: string) => t !== "friends")
+                                .join(", "),
+                            );
+                          }}
                         >
-                          {["guest", "driver", "staff", "vendor"].map((c) => (
-                            <option key={c}>{c}</option>
+                          {[
+                            "guest",
+                            "friends",
+                            "driver",
+                            "staff",
+                            "vendor",
+                          ].map((c) => (
+                            <option key={c} value={c}>
+                              {c === "guest"
+                                ? "Guest / family"
+                                : c === "friends"
+                                  ? "Friends"
+                                  : c}
+                            </option>
                           ))}
+                        </select>
+                      </label>
+                      <label>
+                        Male / female
+                        <select
+                          value={g.gender || "unspecified"}
+                          onChange={(e) => edit("gender", e.target.value)}
+                        >
+                          <option value="unspecified">Not specified yet</option>
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
                         </select>
                       </label>
                       <label>
@@ -2731,40 +2803,47 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                         inputMode="tel"
                       />
                     </label>
-                    <div className="preset-tags">
-                      {[
-                        ["ground_floor", "Ground floor required"],
-                        ["second_hotel", "Second-hotel eligible"],
-                        ["near_restaurant", "Near restaurant"],
-                      ].map(([tag, label]) => (
-                        <label className="checkbox-label" key={tag}>
-                          <input
-                            type="checkbox"
-                            checked={g.tags
-                              .split(",")
-                              .map((s: string) => s.trim())
-                              .includes(tag)}
-                            onChange={(e) => {
-                              const tags = g.tags
-                                .split(",")
-                                .map((s: string) => s.trim())
-                                .filter(Boolean)
-                                .filter((s: string) => s !== tag);
-                              if (e.target.checked) tags.push(tag);
-                              edit("tags", tags.join(", "));
-                            }}
-                          />
-                          {label}
-                        </label>
-                      ))}
-                    </div>
-                    <label>
-                      Tags, separated by commas
-                      <input
-                        value={g.tags}
-                        onChange={(e) => edit("tags", e.target.value)}
-                      />
-                    </label>
+                    <TagPicker
+                      allowFriends={g.category === "guest"}
+                      value={[
+                        ...g.tags
+                          .split(",")
+                          .map((t: string) => t.trim())
+                          .filter((t: string) => t && t !== "friends"),
+                        ...(g.sharing_mode === "friends" ? ["friends"] : []),
+                      ]}
+                      known={
+                        [
+                          ...new Set(
+                            data.guests
+                              .flatMap((p) => p.tags)
+                              .concat(
+                                data.rules?.map((r) => r.tag).filter(Boolean) ||
+                                  [],
+                              ),
+                          ),
+                        ] as string[]
+                      }
+                      onChange={(tags) => {
+                        edit(
+                          "tags",
+                          tags.filter((t) => t !== "friends").join(", "),
+                        );
+                        edit(
+                          "sharing_mode",
+                          tags.includes("friends") && g.category === "guest"
+                            ? "friends"
+                            : "family",
+                        );
+                      }}
+                    />
+                    {g.sharing_mode === "friends" && (
+                      <p className="form-help">
+                        Automatic sharing uses the same specified gender and
+                        side. Not specified guests keep a separate room. Couples
+                        and linked children stay together.
+                      </p>
+                    )}
                     <label>
                       Private owner note
                       <textarea
@@ -2871,7 +2950,9 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
           title={
             preview.importing
               ? "Review guest import"
-              : "Review assignment change"
+              : preview.family_edit
+                ? "Review guest details & room changes"
+                : "Review assignment change"
           }
           close={() => setPreview(null)}
         >
@@ -2880,6 +2961,16 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
               ? `${preview.guests} guest rows in ${preview.families} families/groups. Nothing is saved until you apply.`
               : "Your current plan stays unchanged until you apply this exact preview."}
           </p>
+          {preview.reason && <p className="alert">{preview.reason}</p>}
+          {preview.family_edit && (
+            <div className="edited-details">
+              {preview.edited_guests?.map((g) => (
+                <p key={g.id}>
+                  <b>{guestName(g)}</b> · Age {g.age ?? "pending"}
+                </p>
+              ))}
+            </div>
+          )}
           {preview.summary &&
             nights.map((n) => (
               <div className="cost-line" key={n}>
@@ -2911,7 +3002,11 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                   {preview.changes.map((c) => (
                     <tr key={c.guest_id + c.night}>
                       <td>
-                        {guestName(data.guests.find((g) => g.id === c.guest_id))}
+                        {guestName(
+                          preview.edited_guests?.find(
+                            (g) => g.id === c.guest_id,
+                          ) || data.guests.find((g) => g.id === c.guest_id),
+                        )}
                       </td>
                       <td>{dayName(c.night)}</td>
                       <td>
@@ -2958,9 +3053,8 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                 {w.guest_ids?.length ? (
                   <small>
                     {w.guest_ids
-                      .map(
-                        (id) =>
-                          guestName(data.guests.find((g) => g.id === id)),
+                      .map((id) =>
+                        guestName(data.guests.find((g) => g.id === id)),
                       )
                       .join(", ")}
                   </small>
