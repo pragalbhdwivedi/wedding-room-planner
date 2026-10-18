@@ -1,6 +1,6 @@
 # Proposed architecture
 
-Status: proposed technical design, not implemented. Docker delivery is owner-confirmed. Concrete library/base-image versions will be pinned after compatibility checks at implementation time.
+Status: application architecture remains proposed, not implemented. Docker delivery is owner-confirmed; dedicated host preparation is recorded in INFRASTRUCTURE.md. Concrete application library/base-image versions will be pinned after compatibility checks at implementation time.
 
 ## Components
 
@@ -68,7 +68,7 @@ Use revision numbers for optimistic concurrency even though only one account edi
 - PostgreSQL is not published directly to the internet. Only web ingress is exposed. HTTPS terminates at Caddy or a chosen existing trusted proxy, depending on deployment.
 - Database, authorised uploads, and certificate/config state use persistent volumes. Secrets are provided outside images/source using restricted mounted files/Compose secrets; host source files still need protection.
 - Apply migrations once before new application services become ready. Fail deployment on migration errors.
-- Initial sizing suggestion: 2-4 CPU cores, 4 GB RAM, 40 GB SSD, subject to measurement. A machine has not been selected, inspected, or reserved.
+- Dedicated VM 9601 is prepared with 4 vCPU, 4 GiB RAM and 40 GiB local-lvm storage under the owner's infrastructure instruction; see INFRASTRUCTURE.md and private VM_NOTES. Domain/ingress, backup policy and app deployment remain pending.
 - Pin dependencies/images at implementation; retain lockfiles and provenance. Do not claim a production version from an untested floating latest tag.
 
 ## Backups and upgrades

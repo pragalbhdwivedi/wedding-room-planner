@@ -26,6 +26,9 @@ Dates use Asia/Kolkata. The baseline was reconciled on 19 October 2026. "Confirm
 | D20 | 2026-10-19 | Proposed technical design | Separate web/API/worker/database containers; persistent volumes; one-off migrations; off-host backups and restore test. |
 | D21 | 2026-10-19 | Proposed technical design | Shared server rules, revision checks, owner-accepted solver proposals, safe imports, per-field visibility, audit history. |
 | D22 | 2026-10-19 | Confirmed | Public GitHub repository on owner's profile becomes project source of truth. |
+| D23 | 2026-10-19 | Confirmed | Fresh Debian template 9002 and a new dedicated application VM on Nageshwar local-lvm; preserve source template 9001. |
+| D24 | 2026-10-19 | Confirmed; latest network instruction | Normal/native VLAN 1, not the source template's AADI VLAN. Owner supplies static /23 address for the application VM; template remains DHCP. Connection details stay private. |
+| D25 | 2026-10-19 | Implemented infrastructure choice | Template 9002 and full clone 9601; application VM 4 vCPU, 4 GiB RAM, 40 GiB disk. Docker Engine 29.9.1 / Compose 5.6.0 installed and host reboot verified; application not built. |
 
 ## Future decisions
 

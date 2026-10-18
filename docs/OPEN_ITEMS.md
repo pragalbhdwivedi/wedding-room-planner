@@ -16,7 +16,7 @@ These remain open as of the 19 October 2026 baseline. Do not invent answers. Mos
 | O10 | Final side quotas/separation/mixed-room rules and solver weights | Configurable; do not silently impose equal halves or a universal split. Suggested scoring is proposed. |
 | O11 | Owner account bootstrap, password recovery, viewer account details | Username/password confirmed. No shared/default/public credentials or public self-signup. |
 | O12 | Exact family-view cost/contact/note visibility, reception fields and export permissions | Reception costs forbidden; family own-side scope confirmed. Apply least disclosure pending owner choices. |
-| O13 | Docker host, domain, public/private network access, HTTPS routing | No machine selected, allocated, or verified. No live deployment is authorised merely by repository creation. |
+| O13 | Domain, ingress and HTTPS routing | Dedicated host selected and prepared under D23-D25; see INFRASTRUCTURE.md. Domain, external access, HTTPS, and app deployment remain pending. |
 | O14 | Backup destination, retention, recovery targets, data retention after event | Design for off-host protected backup and restore testing; select actual settings before production. |
 | O15 | Guest names, ages, contacts, headcounts and relationship tags | Enter privately later. Never request or publish these in public issues. |
 | O16 | Public software licence | None selected. Do not add an open-source licence automatically. |

@@ -1,6 +1,6 @@
 # Delivery plan
 
-Status: planned; no phase has been implemented. Repository documentation is the first completed deliverable. Subsequent implementation should be reviewed against REQUIREMENTS.md and ACCEPTANCE.md.
+Status: application phases remain planned. Repository documentation and a dedicated Debian Docker host are prepared; see INFRASTRUCTURE.md. Host readiness does not complete phase 1's application/login/database deliverables. Subsequent implementation should be reviewed against REQUIREMENTS.md and ACCEPTANCE.md.
 
 | Phase | Deliverables | Evidence before claiming completion |
 | --- | --- | --- |
