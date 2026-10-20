@@ -79,6 +79,38 @@
   --sidebar-ink: #f0f5ff;
   --shadow: 0 12px 32px #0007;
 }
+
+.app-update-banner {
+  position: fixed;
+  z-index: 10000;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(620px, calc(100vw - 24px));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  font-size: 14px;
+}
+.app-update-banner button {
+  flex: none;
+  border: 0;
+  border-radius: 8px;
+  padding: 9px 12px;
+  background: var(--action);
+  color: var(--on-action);
+  font-weight: 650;
+}
+@media (max-width: 520px) {
+  .app-update-banner { flex-direction: column; align-items: stretch; }
+}
 body, .main-content, .workspace-content, .main-shell { background: var(--canvas); color: var(--ink); }
 h1, h2, .planning-workspace h1, .planning-workspace h2,
 .attendance-card .section-heading h2, .night-cost-grid .settings-card > strong {

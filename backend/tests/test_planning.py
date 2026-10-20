@@ -638,6 +638,23 @@ def test_second_hotel_room_number_remains_editable(client,owner):
     assert revision(client)==old
 
 
+def test_bulk_layout_save_preserves_rooms_and_guest_placements(client,owner):
+    people=family(client,owner,[member('Synthetic Layout Guest',32)])
+    assign(client,owner,people,'w-101')
+    before=plan(client)
+    positions=[{'resource_id':'w-101','x':270,'y':270},{'resource_id':'w-102','x':540,'y':270}]
+    saved=client.put('/api/planning/layout',json={'revision':before['revision'],'positions':positions},headers=headers(owner))
+    assert saved.status_code==200,saved.text
+    after=plan(client)
+    assert {(r['id'],r['x'],r['y']) for r in after['resources'] if r['id'] in {'w-101','w-102'}}=={
+        ('w-101',270,270),('w-102',540,270)}
+    assert after['assignments']==before['assignments']
+    assert {r['id']:(r['number'],r['category']) for r in after['resources']}=={
+        r['id']:(r['number'],r['category']) for r in before['resources']}
+    stale=client.put('/api/planning/layout',json={'revision':before['revision'],'positions':positions},headers=headers(owner))
+    assert stale.status_code==409
+
+
 def test_automatic_pool_allocation_applies_and_is_not_reported_stale(client,owner):
     family(client,owner,[member(None,None,age_band='adult')])
     job=client.post('/api/planning/allocation',json={'revision':revision(client)},headers=headers(owner));assert job.status_code==202
