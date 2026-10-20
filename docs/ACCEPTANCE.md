@@ -50,6 +50,7 @@ Status: acceptance plan; actual results are recorded separately in STATUS.md. Us
 | A38 | No named family rooms yet | At most 20 of 24 Premium rooms used across the union of both nights; four remain unused. Named reservations still enforce eligibility. |
 | A39 | Initial room view | All 44 Wyndham cards visible by scrolling, count shown; topology and filters available on laptop/phone. |
 | A40 | Invitation family directory and function times | No duplicate accommodation guests, owner-only writes, family-side scope, source links, midnight date preserved, scoped Excel function details. |
+| A41 | HTTPS reverse-proxy sign-in | Public HTTP redirects to the HTTPS sign-in page without a loop; the exact HTTPS origin reaches sign-in validation, a foreign origin remains rejected, a valid sign-in receives a Secure session cookie, and authenticated owner/viewer access retains its existing scopes. Check on the owner's device; a health check alone does not satisfy this. |
 
 ## Owner acceptance
 

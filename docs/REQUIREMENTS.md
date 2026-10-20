@@ -102,6 +102,8 @@ Owner instruction on 19 October 2026: download a fresh Debian cloud image, creat
 
 Subsequent owner instruction: expose the preview on the local network so other LAN devices can open it without the owner's PC tunnel. Keep authentication and owner/viewer restrictions. LAN exposure does not authorize internet publishing or direct database exposure.
 
+On 20 October 2026 the owner put the planner behind an HTTPS reverse proxy and requested a sign-in fix. Trust only that exact HTTPS origin, require Secure session cookies, and keep owner/viewer authorization and private database/API exposure unchanged. Public proxy reachability does not by itself verify a real sign-in or final event-use acceptance.
+
 ## Implementation qualification — core planning release
 
 The supported child examples are retained; larger young-child arrangements remain unresolved under O02 rather than becoming an invented hotel policy. The first allocator uses whole-family units and bounded search. It may leave oversized families or unknown ages unassigned for manual review. Neither a solver proposal nor an estimate is applied/finalised automatically. Actual arrival/departure, function attendance and meal attendance are independent records. One person cannot be counted for the same meal at two locations on the same attendance basis.
