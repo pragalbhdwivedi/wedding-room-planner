@@ -16,7 +16,7 @@ These remain open as of the 19 October 2026 baseline. Do not invent answers. Mos
 | O10 | Final side quotas/separation/mixed-room rules and solver weights | Configurable; do not silently impose equal halves or a universal split. Suggested scoring is proposed. |
 | O11 | Password recovery and real viewer account details | Private-key single-owner bootstrap is implemented. No shared/default/public credentials or public self-signup. Recovery remains open; owner creates viewers privately. |
 | O12 | Exact family-view cost/contact/note visibility, reception fields and export permissions | Reception costs forbidden; family own-side scope confirmed. Apply least disclosure pending owner choices. |
-| O13 | Domain, ingress and HTTPS routing | D29 adds an explicit private-address LAN preview. Trusted domain/HTTPS ingress and real-device acceptance remain pending. |
+| O13 | Domain, ingress and HTTPS routing | The app trusts the exact public HTTPS origin with Secure cookies. The proxy now redirects HTTP to HTTPS; direct and public checks passed. The owner confirmed phone sign-in reached the room planner. Final event-use acceptance remains pending. |
 | O14 | Backup destination, retention, recovery targets, data retention after event | Owner explicitly deferred backup work under D26. No scheduled backup or recovery verification is claimed. |
 | O15 | Guest names, ages, contacts, headcounts and relationship tags | Enter privately later. Never request or publish these in public issues. |
 | O16 | Public software licence | None selected. Do not add an open-source licence automatically. |

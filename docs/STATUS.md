@@ -1,10 +1,10 @@
 # Implementation status
 
-Updated 19 October 2026, Asia/Kolkata. Implementation, automated verification, deployment and owner acceptance are separate states.
+Updated 20 October 2026, Asia/Kolkata. Implementation, automated verification, deployment and owner acceptance are separate states.
 
 | Area | State | Evidence / limit |
 | --- | --- | --- |
-| Dedicated Docker host | Prepared and checked | Dedicated Debian VM, private persistent PostgreSQL, web-only LAN ingress |
+| Dedicated Docker host | Prepared and checked | Dedicated Debian VM, private persistent PostgreSQL, web-only upstream behind the owner's HTTPS reverse proxy |
 | Owner login / viewer administration | Implemented; real owner setup completed | Existing sole owner preserved; family/reception remain viewers |
 | Guest/family entry | Implemented | Stable unnamed slots and adult/child bands, pending exact-age flags, private contacts/notes and resident selection |
 | Reservations and topology | Implemented | All-room initial grid, optional four-room Premium reserve pool or four named reservations, editable schematic layout and confirmed corridor/restaurant flags |
@@ -15,8 +15,8 @@ Updated 19 October 2026, Asia/Kolkata. Implementation, automated verification, d
 | Excel and live views | Implemented | Owner guest import preview, stable-ID re-import, scoped multi-sheet exports, revision-only events, reconnect refresh and stale guards |
 | Automated verification | Passed | 56 isolated PostgreSQL checks and [GitHub Actions run 39177677662](https://github.com/pragalbhdwivedi/wedding-room-planner/actions/runs/39177677662) passed for application head `cf62dfd` |
 | Browser verification | Passed within synthetic preview scope | Phone-sized review named both roommate pairs, required separate acknowledgements, and saved the requested single-person move; earlier picker and laptop/phone checks remain below. |
-| Current real deployment | Running and healthy | `cf62dfd0f14c29cd8c066654f62e0ac727d965ae`, schema `0005_guest_sharing`; four healthy services; account/session/guest/secret/volume preservation verified |
-| HTTPS / backup / acceptance | Pending or deferred | Trusted HTTPS remains open; backups owner-deferred; no owner acceptance for event use yet |
+| Current real deployment | Running and healthy | `cf62dfd0f14c29cd8c066654f62e0ac727d965ae`, schema `0005_guest_sharing`; four healthy services; production HTTPS origin and Secure cookies; account/session/guest/secret/volume preservation verified |
+| HTTPS / backup / acceptance | Proxy sign-in verified / other checks deferred | Public HTTP redirects to HTTPS, origin checks passed, and owner confirmed phone sign-in reached the room planner; backups owner-deferred; no owner acceptance for event use yet |
 
 The previous deployed foundation image was `7fee89fde677d594b2183c3e2cf6ec657467bf77`, schema `0001_foundation`; historical evidence is retained in verification/FOUNDATION.md and verification/LAN.md. The planning upgrade adds schema `0002_planning`. It does not rerun setup or replace credentials.
 
@@ -64,3 +64,9 @@ The exact application images were deployed on 18 October 2026 at 23:23:16 UTC. S
 [PR #14](https://github.com/pragalbhdwivedi/wedding-room-planner/pull/14) application head `cf62dfd0f14c29cd8c066654f62e0ac727d965ae` passed 56 isolated PostgreSQL checks on the dedicated Docker host and in [GitHub Actions run 39177677662](https://github.com/pragalbhdwivedi/wedding-room-planner/actions/runs/39177677662), then merged as `7bbf0dd9110c0101e7137dc01706d497cba5e569`. In a phone-sized synthetic browser run, the occupied-room preview named two incompatible pairs, required a separate sharing acknowledgement for each, and atomically saved both links and the move. Tests also verified that previews do not save links, missing acknowledgements reject application, and hard exclusions and Friends rules remain enforced. The synthetic database and its forward were removed after verification.
 
 The exact application images were deployed on 18 October 2026 at 23:46:02 UTC. Schema remained `0005_guest_sharing`; API, database, web and worker were healthy. Existing owner credentials, sessions, guest IDs, private secrets and the PostgreSQL volume were preserved; planning data was unchanged during deployment. Protected unauthenticated endpoints returned 401 and only web remained published on the LAN. A requested live two-night placement was separately checked in the owner view; personal names and room-level evidence remain private. Exact ages and other provisional details still need owner review. Backup, trusted HTTPS and final event-use acceptance remain open.
+
+## HTTPS reverse-proxy origin
+
+On 20 October 2026 the owner reported an untrusted-page error when signing in through their new reverse proxy. The live app was still in LAN mode and trusted only explicit HTTP private/loopback origins. An unauthenticated malformed sign-in request from the public HTTPS origin returned 403 before the change. At 10:10:37 UTC, the same application images were recreated with production mode, one exact HTTPS origin and Secure cookies; schema remained `0005_guest_sharing` and all four services were healthy. Private checks confirmed the existing credentials, sessions, guest IDs, secrets, and PostgreSQL volume were preserved, with planning data unchanged while its revision was stable.
+
+After the application change, the same malformed sign-in request reached normal input validation (422); a foreign origin remained 403, public HTTPS health returned 200, and unauthenticated planning data returned 401. The runtime app also reported production mode, the exact trusted origin and Secure cookies. Public HTTP initially still returned the sign-in page (200), which rejected an HTTP-origin sign-in. The planner proxy host's Force SSL option was enabled at 10:18 UTC. Direct and public HTTP then returned 301 to the exact HTTPS address; HTTPS returned 200 without a redirect loop, and the HTTPS sign-in request still reached input validation. The owner subsequently confirmed that phone sign-in reached the room planner. No real password was handled by this verification; final event-use acceptance and backups remain separate pending checks. Operational hostnames, guest details and private configuration remain outside Git.
