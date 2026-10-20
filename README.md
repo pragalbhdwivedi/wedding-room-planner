@@ -37,7 +37,7 @@ The owner and full-access editors may change planning data, rates and users. Fam
 
 - Wyndham: 44 fixed hotel-listed rooms, 20 Superior and 24 Premium; 40 general guest rooms and four Premium rooms reserved for family. Upgrade or downgrade a stay by moving its occupants to a different numbered room.
 - Separate hotel: six rooms, each accommodating up to four adults.
-- Separate staff dormitory: 12 free beds; mandatory separation from guest accommodation.
+- Separate staff dormitory: 12 free beds. Automatic allocation keeps workers and guests apart; an editor can make a manual exception after seeing a warning.
 - Wyndham package: 120 + 8 complimentary counted guests per night, including family-room occupants. Children aged 10 or under enter that count only when a separate bed is explicitly assigned for that night.
 - Wyndham excess residents: INR 5,000 per chargeable person per night, including food and all taxes; no carryover assumed.
 - Driver/staff/vendor meals: INR 150 per person per meal.

@@ -36,9 +36,9 @@ Store actual room relationships separately from drawing coordinates. Ground-floo
 
 ## Shared validation
 
-A single backend rules module must validate proposed manual moves, imports, solver output, and applied assignments. The frontend may preview checks but is not the authority. Separate non-overridable integrity/accommodation rules from owner-overridable social preferences.
+A single backend rules module validates proposed manual moves, imports, solver output, and applied assignments. The frontend may preview checks but is not the authority. Manual moves convert planning conflicts into visible advisory warnings; the solver still uses those rules as constraints. Referential integrity, unique guest-night assignment, revision safety, authorization and fixed physical inventory remain enforced.
 
-A warning override records the affected rule, exact attempted change, explicit owner confirmation, reason where required, actor, and data revision. Revalidate if data changed. A generic confirmed=true must not bypass unrelated warnings.
+A manual placement records the exact change, warning IDs, acting editor and data revision in the audit history. Its owner-bound preview expires and is revalidated at apply time. No per-warning checkbox or implicit sharing-compatibility relationship is required. Existing manual exceptions do not prevent unrelated guest, import or room-setting edits; new conflicts introduced by those other workflows still receive their own validation.
 
 ## Automatic assignment
 

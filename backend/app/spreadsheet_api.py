@@ -15,7 +15,7 @@ from sqlalchemy import select
 from .models import Family, Guest, PendingChange, now
 from .planning_api import ApplyInput, DB, GuestInput, Editor, Viewer, WRITE, billing_data, event_data, meal_rows, record
 from .planning_rules import issue, validate
-from .planning_store import hard_check, locked_state, snapshot, visible_plan
+from .planning_store import locked_state, snapshot, visible_plan
 
 router=APIRouter(prefix="/api/planning")
 HEADERS=['Guest ID','Family ID','Group','Side','Reserved eligible','Couple with children','Name','Age','Category','Phone','Arrival','Tags','Private notes','Age band','Gender','Sharing mode','Family room type']
@@ -148,8 +148,11 @@ def parse_import(content,current):
         f=fmap[g['family_id']]
         for key in ['side','reserved_eligible','couple_children','required_room_type']:g[key]=f[key]
     if len(merged['guests'])>1000:errors.append({'row':None,'message':'The event supports at most 1,000 guest slots.'})
-    checked=validate(merged,current['assignments']);errors.extend({'row':None,'message':i['message']} for i in checked['errors'])
-    old_warnings={w['id'] for w in validate(current,current['assignments'])['warnings']}
+    checked=validate(merged,current['assignments'])
+    previous=validate(current,current['assignments'])
+    old_errors={e['id'] for e in previous['errors']}
+    errors.extend({'row':None,'message':i['message']} for i in checked['errors'] if i['id'] not in old_errors)
+    old_warnings={w['id'] for w in previous['warnings']}
     warnings.extend(w for w in checked['warnings'] if w['id'] not in old_warnings)
     return {'families':list(families.values()),'guests':list(guests.values())},errors,warnings
 
@@ -183,8 +186,11 @@ def apply_import(body:ApplyInput,user:Editor,db:DB):
         if not row:row=Guest(id=uuid.UUID(g['id']),family_id=uuid.UUID(g['family_id']));db.add(row)
         for k in ['name','age','age_band','gender','sharing_mode','category','phone','tags','notes']:setattr(row,k,g[k])
         row.arrival=date.fromisoformat(g['arrival']) if g['arrival'] else None
-    db.flush();after=snapshot(db);checked=hard_check(after,after['assignments'])
-    old={w['id'] for w in validate(before,before['assignments'])['warnings']}
+    db.flush();after=snapshot(db);checked=validate(after,after['assignments'])
+    previous=validate(before,before['assignments'])
+    new_errors=[e for e in checked['errors'] if e['id'] not in {old['id'] for old in previous['errors']}]
+    if new_errors:raise HTTPException(409,{'message':'Import conditions changed; preview again','errors':new_errors})
+    old={w['id'] for w in previous['warnings']}
     if not {w['id'] for w in checked['warnings'] if w['id'] not in old}.issubset(set(body.acknowledged)):raise HTTPException(409,'Import conditions changed; preview again')
     count=len(pending.payload['guests']);db.delete(pending)
     return record(db,user,state,'import.applied',{'rows':count,'warning_ids':body.acknowledged})

@@ -102,8 +102,12 @@ def record(db,user,state,action,details=None):
 
 def verify_edit(db,before):
     after=snapshot(db)
-    result=hard_check(after,after["assignments"])
-    old={i["id"] for i in validate(before,before["assignments"])["warnings"]}
+    result=validate(after,after["assignments"])
+    previous=validate(before,before["assignments"])
+    old_errors={i["id"] for i in previous["errors"]}
+    new_errors=[i for i in result["errors"] if i["id"] not in old_errors]
+    if new_errors:raise HTTPException(409,{"message":"This edit introduces placement conflicts.","errors":new_errors})
+    old={i["id"] for i in previous["warnings"]}
     new=[w for w in result["warnings"] if w["id"] not in old]
     if new:raise HTTPException(409,{"message":"This edit introduces placement warnings. Unassign affected guests, then review their new placement.","errors":new})
 
@@ -154,7 +158,10 @@ def update_family(family_id:uuid.UUID,body:FamilyInput,user:Editor,db:DB):
     removed=set(payload['removed_guest_ids'])
     base=[a for a in before['assignments'] if a['guest_id'] not in removed]
     checked=validate(data,base,before=before['assignments'])
-    old={w['id'] for w in validate(before,before['assignments'])['warnings']}
+    previous=validate(before,before['assignments'])
+    old={w['id'] for w in previous['warnings']}
+    existing_errors={e['id'] for e in previous['errors']}
+    checked['errors']=[e for e in checked['errors'] if e['id'] not in existing_errors]
     added={g['id'] for g in payload['guests']}-{g['id'] for g in before['guests']}
     placed_family=bool(added and all(g['age_band']!='unknown' for g in payload['guests'] if g['id'] in added) and any(a['guest_id'] in {g['id'] for g in before['guests'] if g['family_id']==str(family_id)} for a in before['assignments']))
     if not removed and not placed_family and not checked['errors'] and not [w for w in checked['warnings'] if w['id'] not in old]:
@@ -202,7 +209,10 @@ def apply_family_edit(body:ApplyInput,user:Editor,db:DB):
     if not pending or pending.kind!='family_edit' or pending.owner_id!=user.id or pending.revision!=state.revision or pending.expires_at<=now():raise HTTPException(409,'This guest-edit preview changed or expired. Review the edit again.')
     before=snapshot(db);old={w['id'] for w in validate(before,before['assignments'])['warnings']}
     persist_family_edit(db,pending.payload);data=snapshot(db);after=pending.payload['after']
-    result=hard_check(data,after,before['assignments'])
+    result=validate(data,after,before=before['assignments'])
+    previous=validate(before,before['assignments'])
+    introduced=[e for e in result['errors'] if e['id'] not in {old['id'] for old in previous['errors']}]
+    if introduced:raise HTTPException(409,{'message':'The guest edit introduces placement conflicts. Review again.','errors':introduced})
     expected={w['id'] for w in result['warnings'] if w['id'] not in old}
     if expected!={w['id'] for w in pending.warnings} or set(body.acknowledged)!=expected:raise HTTPException(409,'Acknowledge exactly the warnings in this guest-edit preview.')
     if after!=before['assignments']:
@@ -456,7 +466,7 @@ def destinations(body:Destinations,user:Editor,db:DB):
     for room in data['resources']:
         rows=base+[{'guest_id':g,'night':body.night,'resource_id':room['id']} for g in ids]
         result=validate(data,rows,before=data['assignments'])
-        choices[room['id']]={'allowed':not result['errors'],'warnings':len(result['warnings']),'reason':result['errors'][0]['message'] if result['errors'] else ''}
+        choices[room['id']]={'allowed':True,'warnings':len(result['errors'])+len(result['warnings']),'reason':result['errors'][0]['message'] if result['errors'] else ''}
     return {'revision':body.revision,'choices':choices}
 
 
@@ -477,18 +487,29 @@ def sharing_candidates(data,after,moved_ids):
     return pairs if not validate(with_sharing(data,pairs),after,before=data["assignments"])["errors"] else []
 
 
-def preview_plan(db,user,revision,after,kind="assignment",sharing_pairs=()):
+def advisory_issues(data,after,before):
+    current=validate(data,after,before=before)
+    previous=validate(data,before)
+    known={i['id'] for level in ('errors','warnings') for i in previous[level]}
+    return [{**i,'severity':'warning','original_severity':i['severity']}
+            for level in ('errors','warnings') for i in current[level] if i['id'] not in known]
+
+
+def preview_plan(db,user,revision,after,kind="assignment",sharing_pairs=(),manual_override=False):
     locked_state(db,revision);before=snapshot(db);result=validate(with_sharing(before,sharing_pairs),after,before=before["assignments"])
-    if result["errors"]:return {"errors":result["errors"],"warnings":result["warnings"],"token":None,"revision":revision}
-    old={w['id'] for w in validate(before,before['assignments'])['warnings']}
-    warnings=[w for w in result['warnings'] if w['id'] not in old]+[sharing_warning(a,b) for a,b in sharing_pairs]
-    pending=PendingChange(owner_id=user.id,revision=revision,kind=kind,payload={"after":after,"sharing_pairs":list(sharing_pairs)},warnings=warnings,expires_at=now()+timedelta(minutes=5))
+    if manual_override:
+        warnings=advisory_issues(before,after,before['assignments'])
+    else:
+        if result["errors"]:return {"errors":result["errors"],"warnings":result["warnings"],"token":None,"revision":revision}
+        old={w['id'] for w in validate(before,before['assignments'])['warnings']}
+        warnings=[w for w in result['warnings'] if w['id'] not in old]+[sharing_warning(a,b) for a,b in sharing_pairs]
+    pending=PendingChange(owner_id=user.id,revision=revision,kind=kind,payload={"after":after,"sharing_pairs":list(sharing_pairs),"manual_override":manual_override},warnings=warnings,expires_at=now()+timedelta(minutes=5))
     db.add(pending);db.commit()
     old_rows={(a['guest_id'],a['night']):a['resource_id'] for a in before['assignments']}
     new_rows={(a['guest_id'],a['night']):a['resource_id'] for a in after}
     changes=[{'guest_id':gid,'night':night,'from':old_rows.get((gid,night)),'to':new_rows.get((gid,night))} for gid,night in sorted(old_rows.keys()|new_rows.keys()) if old_rows.get((gid,night))!=new_rows.get((gid,night))]
     cost=billing_data(db,rows=after)
-    return {"token":str(pending.id),"revision":revision,"errors":[],"warnings":warnings,"summary":summaries_for(db,after),"changes":changes,"estimate":{"known_subtotal_paise":cost['known_subtotal_paise'],"unpriced":len(cost['unpriced'])}}
+    return {"token":str(pending.id),"revision":revision,"errors":[],"warnings":warnings,"manual_override":manual_override,"summary":summaries_for(db,after),"changes":changes,"estimate":{"known_subtotal_paise":cost['known_subtotal_paise'],"unpriced":len(cost['unpriced'])}}
 
 
 def summaries_for(db,rows):
@@ -505,14 +526,12 @@ def preview_moves(body:Moves,user:Editor,db:DB):
         seen.add(key)
         if not db.get(Guest,move.guest_id):raise HTTPException(404,"Guest no longer exists")
         if move.resource_id:
+            if not db.get(Resource,move.resource_id):raise HTTPException(404,"Room or bed no longer exists")
             if key not in current or current[key]["resource_id"]!=move.resource_id:
                 current[key]={"guest_id":key[0],"night":key[1],"resource_id":move.resource_id}
         else:current.pop(key,None)
     after=sorted(current.values(),key=lambda a:(a["night"],a["guest_id"]))
-    data=snapshot(db)
-    pairs=sharing_candidates(data,after,{str(move.guest_id) for move in body.moves})
-    result=preview_plan(db,user,body.revision,after,sharing_pairs=pairs if body.confirm_sharing else ())
-    result["can_confirm_sharing"]=bool(pairs) and not body.confirm_sharing
+    result=preview_plan(db,user,body.revision,after,manual_override=True)
     result["request_moves"]=[move.model_dump(mode="json") for move in body.moves]
     return result
 
@@ -526,11 +545,18 @@ def apply_assignment(body:ApplyInput,user:Editor,db:DB):
     if pending.revision!=state.revision:raise HTTPException(409,"The plan changed after preview. Preview again.")
     data=snapshot(db);before=data["assignments"];after=pending.payload["after"]
     pairs=[tuple(pair) for pair in pending.payload.get("sharing_pairs",[])]
+    manual_override=bool(pending.payload.get("manual_override"))
+    if not manual_override and not pending.payload.get('allocation_run') and not pending.payload.get('history_direction'):
+        raise HTTPException(409,"This older room preview has expired. Refresh the page and preview the arrangement again.")
     if pairs and pairs!=sharing_candidates(data,after,{g for pair in pairs for g in pair}):raise HTTPException(409,"Sharing consent changed. Preview the move again.")
-    result=hard_check(with_sharing(data,pairs),after,before)
-    old={w['id'] for w in validate(data,before)['warnings']}
-    expected={w["id"] for w in result["warnings"] if w['id'] not in old}|{sharing_warning(a,b)["id"] for a,b in pairs}
-    if expected!={w["id"] for w in pending.warnings} or set(body.acknowledged)!=expected:raise HTTPException(409,"Explicitly acknowledge exactly the warnings in this preview.")
+    if manual_override:
+        expected={w['id'] for w in advisory_issues(data,after,before)}
+    else:
+        result=hard_check(with_sharing(data,pairs),after,before)
+        old={w['id'] for w in validate(data,before)['warnings']}
+        expected={w["id"] for w in result["warnings"] if w['id'] not in old}|{sharing_warning(a,b)["id"] for a,b in pairs}
+    if expected!={w["id"] for w in pending.warnings}:raise HTTPException(409,"The placement warnings changed. Preview the move again.")
+    if not manual_override and set(body.acknowledged)!=expected:raise HTTPException(409,"Explicitly acknowledge exactly the warnings in this preview.")
     direction=pending.payload.get('history_direction')
     if direction:
         change=db.get(PlanChange,uuid.UUID(pending.payload['history_change']))
@@ -552,7 +578,7 @@ def apply_assignment(body:ApplyInput,user:Editor,db:DB):
     for a,b in pairs:
         db.add(GuestLink(a=uuid.UUID(a),b=uuid.UUID(b),kind="may_share",severity="hard"))
     save_assignments(db,after);db.delete(pending)
-    return record(db,user,state,"assignment."+(direction or 'applied'),{"change_id":str(change.id),"warning_ids":sorted(expected),"sharing_pairs":pairs})
+    return record(db,user,state,"assignment."+(direction or 'applied'),{"change_id":str(change.id),"warning_ids":sorted(expected),"manual_override":manual_override,"sharing_pairs":pairs})
 
 
 class HistoryInput(Revision):direction:Literal["undo","redo"]
@@ -570,11 +596,9 @@ def history(body:HistoryInput,user:Editor,db:DB):
         if not change or change.parent!=state.cursor:raise HTTPException(409,"Nothing to redo")
         expected,after=change.before,change.after
     if assignments(db)!=expected:raise HTTPException(409,"The current plan no longer matches this history step.")
-    result=hard_check(data,after,data["assignments"])
-    old={w["id"] for w in validate(data,data["assignments"])["warnings"]}
-    new=[w for w in result["warnings"] if w["id"] not in old]
+    new=advisory_issues(data,after,data['assignments'])
     if new:
-        result=preview_plan(db,user,body.revision,after)
+        result=preview_plan(db,user,body.revision,after,manual_override=True)
         pending=db.get(PendingChange,uuid.UUID(result['token']))
         pending.payload={**pending.payload,'history_direction':body.direction,'history_change':str(change.id)}
         db.commit();return result

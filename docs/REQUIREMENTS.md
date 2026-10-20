@@ -15,13 +15,13 @@ Build a private web-based room-allocation application inside Docker. Support pho
 - Extra bedding is included. Superior accommodates three adults/adult-counted occupants; Premium accommodates four, subject to the child-sharing policy below.
 - Supply of extra bedding should not itself be treated as a fixed hotel-wide shortage. Unlimited supply does not authorise arbitrary adult occupancy in a room.
 - Separate hotel: six rooms, three ground-floor and three first-floor, each accommodating up to four adults. Real room numbers and property name are not supplied.
-- Separate dormitory: up to 12 driver/worker beds free. Guests cannot use it, and workers cannot use ordinary guest rooms. These restrictions are mandatory and cannot be overridden.
+- Separate dormitory: up to 12 driver/worker beds free. Automatic allocation places guests in hotel rooms and workers in the dormitory. Manual cross-placement shows a warning but remains available to an authorised editor.
 
 ## R03 - Children, families, and sharing
 
 - Age 10 and below is treated as a child; above age 10 counts as an adult. A child aged 10 or under counts toward hotel guest totals and the chargeable accommodation headcount only when an owner/editor explicitly assigns a separate bed for that child and night. A child sharing without a separate bed remains visible in the physical people/placement count. This supersedes the earlier age-12 suggestion.
 - Couples with children receive Superior rooms with extra bedding rather than Premium rooms.
-- In family/group entry and edit, let an editor tick Superior or Premium as the required room type, or leave both unticked. The choice applies to all members and both nights at Wyndham, guides automatic allocation, and blocks a manual placement in another room type until edited. A couple-with-children group cannot require Premium. This selection does not change a room's own category or imply hotel approval.
+- In family/group entry and edit, let an editor tick Superior or Premium as the preferred room type, or leave both unticked. The choice applies to all members and both nights at Wyndham and guides automatic allocation. A manual placement in another type shows a warning. A couple-with-children group cannot require Premium in its family settings. This selection does not change a room's own category or imply hotel approval.
 - The owner explicitly allowed two adults and two children aged 10 or below in a Superior room. Keep actual headcount separate from adult-counted occupancy.
 - The maximum permitted number of young children physically occupying a room has not been supplied. Do not generalise the example into unlimited physical occupancy.
 - Support named individuals, family headcounts, and later completion of names and ages. Do not double-count a family when its named members are entered.
@@ -74,8 +74,8 @@ Build a private web-based room-allocation application inside Docker. Support pho
 - Drag individuals or whole families; support swapping rooms, moving occupants together, undo/redo, and highlighting compatible destinations.
 - From a selected room, let the owner tick any subset of resident people, including one, two, three or all four members of a family, and review their one-night placement together. Existing room occupants remain unless explicitly moved. This manual room selection does not create a permanent must-share relationship.
 - Allow room/placement locks. Automatic assignment must preserve locks and family-room reservations.
-- When a social/preference rule would be violated, show the warning and obtain explicit owner confirmation before an allowed override. Record the exception.
-- Mandatory dormitory separation, ownership permissions, and data-integrity restrictions are not bypassed by clicking a generic override.
+- For manual room and bed arrangements, show new planning conflicts as warnings and let an authorised owner/editor apply the reviewed move without ticking acknowledgements or creating permanent sharing links. Audit the exact warnings and change. Automatic allocation remains rule-aware.
+- Ownership permissions and data-integrity restrictions still apply: a guest, room/bed and night must exist; a person has at most one placement per night; stale previews cannot apply; fixed hotel inventory cannot be renamed or retyped.
 - If not everyone can be assigned, keep unresolved people visible with a reason. Do not silently violate rules to produce a complete-looking result.
 
 ## R09 - Summary and colours

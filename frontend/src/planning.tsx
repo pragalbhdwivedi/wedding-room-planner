@@ -121,6 +121,7 @@ type Preview = {
   revision: number;
   errors: any[];
   warnings: Warning[];
+  manual_override?: boolean;
   can_confirm_sharing?: boolean;
   request_moves?: { guest_id: string; night: string; resource_id: string | null }[];
   summary?: Record<string, any>;
@@ -266,6 +267,7 @@ type RoomData = {
   locked: boolean;
   selected: boolean;
   allowed?: boolean;
+  warnings?: number;
   reason?: string;
   owner: boolean;
   topology?: boolean;
@@ -279,7 +281,7 @@ function RoomNode({ data }: { data: RoomData }) {
     side = sides.size > 1 ? "mixed" : data.people[0]?.side || "empty";
   return (
     <div
-      className={`plan-room ${side} ${r.reserved ? "reserved" : ""} ${data.selected && data.allowed !== undefined ? (data.allowed ? "can-place" : "cannot-place") : ""}`}
+      className={`plan-room ${side} ${r.reserved ? "reserved" : ""} ${data.selected && data.allowed !== undefined ? (data.warnings ? "place-warning" : "can-place") : ""}`}
       title={data.reason || undefined}
       role="button"
       data-room-id={r.id}
@@ -387,9 +389,7 @@ function RoomNode({ data }: { data: RoomData }) {
       </div>
       {data.selected && data.allowed !== undefined && (
         <div className="placement-hint">
-          {data.allowed
-            ? "✓ Eligible · review any warnings"
-            : "⚠ Placement conflict"}
+          {data.warnings ? `⚠ ${data.warnings} warning${data.warnings === 1 ? "" : "s"} · you can still place here` : "✓ No placement warnings"}
         </div>
       )}
     </div>
@@ -671,15 +671,6 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
     if (result) openPreview(result);
     return result;
   }
-  async function reviewSharing() {
-    if (!data || !preview?.request_moves) return;
-    const result = await action("/assignments/preview", {
-      revision: data.revision,
-      moves: preview.request_moves,
-      confirm_sharing: true,
-    });
-    if (result) openPreview(result);
-  }
   function openRoomPicker(r: Resource) {
     if (!owner) return;
     setDetails(null);
@@ -812,6 +803,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
           ),
           selected: !!selection.length || !!swapFrom,
           allowed: destinations[r.id]?.allowed,
+          warnings: destinations[r.id]?.warnings,
           reason: destinations[r.id]?.reason,
           owner,
           choose: chooseRoom,
@@ -951,7 +943,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
         : preview.family_edit
           ? "/families/apply"
           : "/assignments/apply",
-      { revision: preview.revision, token: preview.token, acknowledged: acks },
+      { revision: preview.revision, token: preview.token, acknowledged: preview.manual_override ? [] : acks },
     );
     if (result) {
       if (preview.family_edit) setFamilyDraft(null);
@@ -3128,11 +3120,6 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
               ) : null}
             </div>
           ))}
-          {preview.can_confirm_sharing && (
-            <button className="secondary" disabled={busy} onClick={reviewSharing}>
-              Review sharing with these people
-            </button>
-          )}
           {preview.changes && (
             <div className="table-wrap">
               <table className="planning-table">
@@ -3181,8 +3168,8 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
             </p>
           )}
           {preview.warnings.map((w) => (
-            <label className="warning-review" key={w.id}>
-              <input
+            <div className="warning-review" key={w.id}>
+              {!preview.manual_override && <input
                 type="checkbox"
                 checked={acks.includes(w.id)}
                 onChange={(e) =>
@@ -3192,7 +3179,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                       : acks.filter((id) => id !== w.id),
                   )
                 }
-              />
+              />}
               <span>
                 <b>⚠ {w.night && dayName(w.night)}</b>
                 {w.message}
@@ -3217,7 +3204,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                   </small>
                 ) : null}
               </span>
-            </label>
+            </div>
           ))}
           {error && <div className="alert error">{error}</div>}
           <button
@@ -3226,11 +3213,11 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
               busy ||
               !preview.token ||
               preview.errors.length > 0 ||
-              acks.length !== preview.warnings.length
+              (!preview.manual_override && acks.length !== preview.warnings.length)
             }
             onClick={confirmPreview}
           >
-            Apply reviewed change
+            {preview.manual_override ? "Apply arrangement" : "Apply reviewed change"}
             <Check size={16} />
           </button>
         </Dialog>

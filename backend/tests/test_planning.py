@@ -19,7 +19,7 @@ from app.billing import calculate
 from app.db import SessionLocal
 from app.jobs import process_one
 from app.main import app
-from app.models import AllocationRun, LoginSession, PlanState, User, now
+from app.models import AllocationRun, Audit, LoginSession, PlanState, User, now
 from app.planning_api import events
 from app.planning_rules import NIGHTS, validate
 from app.planning_store import snapshot
@@ -178,26 +178,26 @@ def test_child_counts_only_with_explicit_bed_for_each_night(client,owner):
 
 def test_reservations_capacity_children_bedding_and_ground_floor(client,owner):
     young=family(client,owner,[member('Synthetic Parent A',35),member('Synthetic Parent B',34),member('Synthetic Child A',10),member('Synthetic Child B',4)],couple_children=True)
-    assert any(e['code']=='couple_children' for e in preview(client,owner,young,'w-105')['errors'])
+    assert any(e['code']=='couple_children' for e in preview(client,owner,young,'w-105')['warnings'])
     reserve(client,owner)
-    assert any(e['code']=='couple_children' for e in preview(client,owner,young,'w-105')['errors'])
+    assert any(e['code']=='couple_children' for e in preview(client,owner,young,'w-105')['warnings'])
     assign(client,owner,young,'w-102')
     s=plan(client)['summary'][NIGHTS[0]];assert s['assigned']==4 and s['hotel_guests']==2 and s['extra_bedding']==0
     older=family(client,owner,[member('Synthetic Elder',50)],label='Elder')
-    assert any(e['code']=='ground_floor' for e in preview(client,owner,older,'w-202')['errors'])
+    assert any(e['code']=='ground_floor' for e in preview(client,owner,older,'w-202')['warnings'])
     assign(client,owner,older,'w-104')
     tagged=family(client,owner,[member('Synthetic Tagged',29,tags=['ground_floor'])],label='Tagged')
-    assert any(e['code']=='ground_floor' for e in preview(client,owner,tagged,'w-206')['errors'])
+    assert any(e['code']=='ground_floor' for e in preview(client,owner,tagged,'w-206')['warnings'])
     adults=family(client,owner,[member('Synthetic Adult '+str(i),11+i) for i in range(4)],label='Four adults')
-    assert any(e['code']=='capacity' for e in preview(client,owner,adults,'w-110')['errors'])
+    assert any(e['code']=='capacity' for e in preview(client,owner,adults,'w-110')['warnings'])
     unknown=family(client,owner,[member('Unknown Age',None)],label='Unknown')
-    assert any(e['code']=='age_unknown' for e in preview(client,owner,unknown,'w-112')['errors'])
+    assert any(e['code']=='age_unknown' for e in preview(client,owner,unknown,'w-112')['warnings'])
 
 
 def test_family_room_type_selection_controls_moves_allocation_and_edit_review(client,owner):
     people=family(client,owner,[member('Synthetic Premium Guest',32)],required_room_type='premium')
     assert plan(client)['families'][0]['required_room_type']=='premium'
-    assert any(e['code']=='family_room_type' for e in preview(client,owner,people,'w-102')['errors'])
+    assert any(e['code']=='family_room_type' for e in preview(client,owner,people,'w-102')['warnings'])
     assert not preview(client,owner,people,'w-105')['errors']
     proposal=allocate(snapshot_for_test(client))
     assert proposal['assignments']
@@ -246,28 +246,28 @@ def test_family_room_type_rejects_conflicting_couple_or_staff(client,owner):
 def test_dormitory_second_hotel_dates_and_reserved_eligibility(client,owner):
     reserve(client,owner)
     guest=family(client,owner,[member('Synthetic Regular',30)],label='Regular')
-    assert any(e['code']=='reserved_family' for e in preview(client,owner,guest,'w-101')['errors'])
-    assert any(e['code']=='staff_separation' for e in preview(client,owner,guest,'bed-1')['errors'])
-    assert any(e['code']=='second_hotel' for e in preview(client,owner,guest,'second-0-1')['errors'])
+    assert any(e['code']=='reserved_family' for e in preview(client,owner,guest,'w-101')['warnings'])
+    assert any(e['code']=='staff_separation' for e in preview(client,owner,guest,'bed-1')['warnings'])
+    assert any(e['code']=='second_hotel' for e in preview(client,owner,guest,'second-0-1')['warnings'])
     eligible=family(client,owner,[member('Synthetic Eligible',30,tags=['second_hotel'],arrival=NIGHTS[1])],label='Eligible',reserved_eligible=True)
-    assert any(e['code']=='stay' for e in preview(client,owner,eligible,'second-0-1')['errors'])
+    assert any(e['code']=='stay' for e in preview(client,owner,eligible,'second-0-1')['warnings'])
     assign(client,owner,eligible,'second-0-1',NIGHTS[1])
     staff=family(client,owner,[member('Synthetic Driver',30,category='driver')],label='Driver')
-    assert any(e['code']=='staff_separation' for e in preview(client,owner,staff,'w-123')['errors'])
+    assert any(e['code']=='staff_separation' for e in preview(client,owner,staff,'w-123')['warnings'])
     assign(client,owner,staff,'bed-1')
     other=family(client,owner,[member('Synthetic Worker',31,category='staff')],label='Worker')
-    assert any(e['code']=='capacity' for e in preview(client,owner,other,'bed-1')['errors'])
+    assert any(e['code']=='capacity' for e in preview(client,owner,other,'bed-1')['warnings'])
     regular_family=family(client,owner,[member('Synthetic Reserved Adult',40)],label='Family reserve',reserved_eligible=True)
     assign(client,owner,regular_family,'w-101')
 
 
-def test_warning_preview_binds_revision_exact_ack_and_is_single_use(client,owner):
+def test_manual_warning_preview_binds_revision_without_ack_and_is_single_use(client,owner):
     people=family(client,owner,[member('Synthetic A'),member('Synthetic B')])
     p=preview(client,owner,[people[0]],'w-102');assert p['token'] and any(w['code']=='family_split' for w in p['warnings'])
     assert p['changes']==[{'guest_id':people[0]['id'],'night':NIGHTS[0],'from':None,'to':'w-102'}]
     assert p['estimate']['known_subtotal_paise']==0 and not plan(client)['assignments']
-    assert apply(client,owner,p,ack=False).status_code==409
-    assert apply(client,owner,p).status_code==200
+    assert p['manual_override'] is True
+    assert apply(client,owner,p,ack=False).status_code==200
     assert apply(client,owner,p).status_code==409
     p=preview(client,owner,[people[1]],'w-104')
     family(client,owner,label='Another change')
@@ -282,14 +282,13 @@ def test_room_picker_subset_of_four_places_only_selected_members(client,owner):
     assert p['token'] and not p['errors']
     assert {c['guest_id'] for c in p['changes']}=={g['id'] for g in chosen}
     assert any(w['code']=='family_split' for w in p['warnings'])
-    assert apply(client,owner,p,ack=False).status_code==409
-    assert apply(client,owner,p).status_code==200
+    assert apply(client,owner,p,ack=False).status_code==200
     placed={a['guest_id'] for a in plan(client)['assignments'] if a['resource_id']=='w-102' and a['night']==NIGHTS[0]}
     assert placed=={g['id'] for g in chosen}
     assert {g['id'] for g in people if g['id'] not in placed}=={people[1]['id'],people[3]['id']}
 
 
-def test_room_sharing_consent_is_previewed_and_saved_with_two_night_move(client,owner):
+def test_manual_sharing_conflict_is_advisory_on_both_nights_without_new_links(client,owner):
     roommates=family(client,owner,[member('Synthetic Roommate A'),member('Synthetic Roommate B')],label='Roommates')
     visitor=family(client,owner,[member('Synthetic Visitor')],label='Visitor')[0]
     for night in NIGHTS:
@@ -298,42 +297,62 @@ def test_room_sharing_consent_is_previewed_and_saved_with_two_night_move(client,
     moves=[{'guest_id':visitor['id'],'night':night,'resource_id':'w-104'} for night in NIGHTS]
     request={'revision':revision(client),'moves':moves}
     first=client.post('/api/planning/assignments/preview',json=request,headers=headers(owner)).json()
-    assert not first['token'] and first['can_confirm_sharing']
-    assert len([e for e in first['errors'] if e['code']=='compatibility'])==4
+    assert first['token'] and first['manual_override'] and not first['errors']
+    assert len([w for w in first['warnings'] if w['code']=='compatibility'])==4
     assert first['request_moves']==moves
-    confirmed=client.post('/api/planning/assignments/preview',json={**request,'confirm_sharing':True},headers=headers(owner)).json()
-    assert confirmed['token'] and not confirmed['errors']
-    assert len([w for w in confirmed['warnings'] if w['id'].startswith('sharing_confirmation:')])==2
-    assert len(confirmed['changes'])==2
+    assert len(first['changes'])==2
     assert not plan(client)['links']
-    assert apply(client,owner,confirmed,ack=False).status_code==409
-    assert apply(client,owner,confirmed).status_code==200
+    assert apply(client,owner,first,ack=False).status_code==200
     saved=plan(client)
     assert {(a['night'],a['resource_id']) for a in saved['assignments'] if a['guest_id']==visitor['id']}=={(night,'w-104') for night in NIGHTS}
-    assert len([l for l in saved['links'] if visitor['id'] in {l['a'],l['b']} and l['kind']=='may_share'])==2
+    assert not saved['links']
     undo=client.post('/api/planning/history',json={'revision':revision(client),'direction':'undo'},headers=headers(owner))
     assert undo.status_code==200,undo.text
-    assert len([l for l in plan(client)['links'] if visitor['id'] in {l['a'],l['b']}])==2
+    assert not plan(client)['links']
 
 
-def test_sharing_consent_does_not_bypass_hard_exclusion_or_friends_rule(client,owner):
+def test_manual_arrangement_can_override_exclusion_and_friends_rule(client,owner):
     first=family(client,owner,[member('Synthetic First')],label='First')[0]
     second=family(client,owner,[member('Synthetic Second')],label='Second')[0]
     link(client,owner,first,second,'cannot_share')
     assign(client,owner,[first],'w-104')
     request={'revision':revision(client),'moves':[{'guest_id':second['id'],'night':NIGHTS[0],'resource_id':'w-104'}]}
     response=client.post('/api/planning/assignments/preview',json=request,headers=headers(owner)).json()
-    assert response['errors'] and not response['can_confirm_sharing']
-    response=client.post('/api/planning/assignments/preview',json={**request,'confirm_sharing':True},headers=headers(owner)).json()
-    assert response['errors'] and not response['token']
+    assert response['token'] and not response['errors']
+    assert any(w['code']=='compatibility' for w in response['warnings'])
+    assert apply(client,owner,response,ack=False).status_code==200
     male=family(client,owner,[member('Synthetic Male',gender='male',sharing_mode='friends')],label='Male friend')[0]
     female=family(client,owner,[member('Synthetic Female',gender='female',sharing_mode='friends')],label='Female friend')[0]
     assign(client,owner,[male],'w-102')
     response=client.post('/api/planning/assignments/preview',json={'revision':revision(client),'moves':[{'guest_id':female['id'],'night':NIGHTS[0],'resource_id':'w-102'}],'confirm_sharing':True},headers=headers(owner)).json()
-    assert response['errors'] and not response['token']
+    assert response['token'] and any(w['code']=='compatibility' for w in response['warnings'])
+    assert apply(client,owner,response,ack=False).status_code==200
 
 
-def test_undo_that_restores_a_warning_requires_exact_review(client,owner):
+def test_manual_placement_warns_but_applies_staff_capacity_and_lock_conflicts(client,owner):
+    guests=family(client,owner,[member(f'Synthetic Guest {i}',30+i) for i in range(4)])
+    staff=family(client,owner,[member('Synthetic Driver',35,category='driver')],label='Staff')[0]
+    assign(client,owner,[guests[0]],'w-102')
+    assert client.put('/api/planning/locks',json={'revision':revision(client),'resource_id':'w-102','night':NIGHTS[0],'locked':True},headers=headers(owner)).status_code==200
+    p=preview(client,owner,guests[1:]+[staff],'w-102')
+    codes={w['code'] for w in p['warnings']}
+    assert p['token'] and not p['errors'] and {'capacity','staff_separation','locked'}<=codes
+    assert apply(client,owner,p,ack=False).status_code==200
+    saved=plan(client)
+    assert len([a for a in saved['assignments'] if a['resource_id']=='w-102'])==5
+    assert {'capacity','staff_separation'}<={e['code'] for e in saved['conflicts']['errors']}
+    # Existing manual exceptions must not make unrelated room settings impossible to edit.
+    changed=client.put('/api/planning/rooms/w-104',json={'revision':revision(client),'near_restaurant':True},headers=headers(owner))
+    assert changed.status_code==200,changed.text
+    with SessionLocal() as db:
+        audit=db.scalar(select(Audit).where(Audit.action=='assignment.applied').order_by(Audit.created_at.desc()))
+        assert audit.details['manual_override'] is True
+        assert {'capacity','staff_separation'}<={part.split(':')[0] for part in audit.details['warning_ids']}
+    missing=client.post('/api/planning/assignments/preview',json={'revision':revision(client),'moves':[{'guest_id':staff['id'],'night':NIGHTS[0],'resource_id':'missing-room'}]},headers=headers(owner))
+    assert missing.status_code==404
+
+
+def test_undo_that_restores_a_warning_requires_review_without_ack(client,owner):
     people=family(client,owner,[member('Synthetic A'),member('Synthetic B')])
     assign(client,owner,[people[0]],'w-102')
     assign(client,owner,[people[1]],'w-102')
@@ -341,8 +360,7 @@ def test_undo_that_restores_a_warning_requires_exact_review(client,owner):
     assert result.status_code==200,result.text
     p=result.json();assert p['token'] and p['warnings']
     assert len(plan(client)['assignments'])==2
-    assert apply(client,owner,p,ack=False).status_code==409
-    assert apply(client,owner,p).status_code==200
+    assert apply(client,owner,p,ack=False).status_code==200
     assert len(plan(client)['assignments'])==1
     assert client.post('/api/planning/history',json={'revision':revision(client),'direction':'redo'},headers=headers(owner)).status_code==200
     assert len(plan(client)['assignments'])==2
@@ -351,13 +369,14 @@ def test_undo_that_restores_a_warning_requires_exact_review(client,owner):
 def test_compatibility_locks_swap_undo_redo_and_candidates(client,owner):
     a=family(client,owner,[member('Synthetic A')],label='A');b=family(client,owner,[member('Synthetic B')],label='B')
     assign(client,owner,a,'w-102')
-    assert any(e['code']=='compatibility' for e in preview(client,owner,b,'w-102')['errors'])
+    assert any(e['code']=='compatibility' for e in preview(client,owner,b,'w-102')['warnings'])
     link(client,owner,a[0],b[0]);assign(client,owner,b,'w-104')
     r=client.post('/api/planning/assignments/destinations',json={'revision':revision(client),'guest_ids':[b[0]['id']],'night':NIGHTS[0]},headers=headers(owner)).json()
-    assert r['choices']['w-102']['allowed'] is True and r['choices']['bed-1']['allowed'] is False
+    assert r['choices']['w-102']['allowed'] is True and r['choices']['bed-1']['allowed'] is True
+    assert r['choices']['bed-1']['warnings'] > 0
     lock={'revision':revision(client),'resource_id':'w-102','night':NIGHTS[0],'locked':True}
     assert client.put('/api/planning/locks',json=lock,headers=headers(owner)).status_code==200
-    assert any(e['code']=='locked' for e in preview(client,owner,a,'w-110')['errors'])
+    assert any(e['code']=='locked' for e in preview(client,owner,a,'w-110')['warnings'])
     lock.update(revision=revision(client),locked=False);assert client.put('/api/planning/locks',json=lock,headers=headers(owner)).status_code==200
     p=client.post('/api/planning/assignments/preview',json={'revision':revision(client),'moves':[{'guest_id':a[0]['id'],'night':NIGHTS[0],'resource_id':'w-104'},{'guest_id':b[0]['id'],'night':NIGHTS[0],'resource_id':'w-102'}]},headers=headers(owner)).json()
     assert apply(client,owner,p).status_code==200
@@ -370,13 +389,13 @@ def test_compatibility_locks_swap_undo_redo_and_candidates(client,owner):
 def test_conditional_rules_verified_connections_and_must_share(client,owner):
     a=family(client,owner,[member('Synthetic A')],label='A');b=family(client,owner,[member('Synthetic B')],label='B')
     link(client,owner,a[0],b[0],'nearby')
-    p=preview(client,owner,a,'w-102');assert any(e['code'].startswith('link_') for e in p['errors'])
+    p=preview(client,owner,a,'w-102');assert any(e['code'].startswith('link_') for e in p['warnings'])
     connection={'revision':revision(client),'a':'w-102','b':'w-104','kind':'opposite','confirmed':True}
     assert client.post('/api/planning/connections',json=connection,headers=headers(owner)).status_code==200
     p=client.post('/api/planning/assignments/preview',json={'revision':revision(client),'moves':[{'guest_id':a[0]['id'],'night':NIGHTS[0],'resource_id':'w-102'},{'guest_id':b[0]['id'],'night':NIGHTS[0],'resource_id':'w-104'}]},headers=headers(owner)).json();assert not p['errors'];assert apply(client,owner,p).status_code==200
     assert client.post('/api/planning/rules',json={'revision':revision(client),'name':'Synthetic allowed block','kind':'allowed_resources','side':'groom','resource_ids':['w-110']},headers=headers(owner)).status_code==200
     groom=family(client,owner,[member('Synthetic Groom')],side='groom',label='Groom')
-    assert any(e['code'].startswith('rule_') for e in preview(client,owner,groom,'w-112')['errors'])
+    assert any(e['code'].startswith('rule_') for e in preview(client,owner,groom,'w-112')['warnings'])
     assign(client,owner,groom,'w-110')
 
 
@@ -738,7 +757,7 @@ def test_friend_gender_combining_and_unknowns_keep_separate(client,owner):
 
 def test_friends_roster_can_split_by_gender_and_exclusions_win(client,owner):
     friends=family(client,owner,[member('Synthetic Friend A',gender='male',sharing_mode='friends'),member('Synthetic Friend B',gender='female',sharing_mode='friends')])
-    wrong=preview(client,owner,friends,'w-101');assert any(e['code']=='compatibility' for e in wrong['errors'])
+    wrong=preview(client,owner,friends,'w-101');assert any(e['code']=='compatibility' for e in wrong['warnings'])
     other=family(client,owner,[member('Synthetic Friend C',gender='male',sharing_mode='friends')],label='Synthetic Other Friend')
     male=next(g for g in friends if g['gender']=='male')
     response=client.post('/api/planning/links',json={'revision':revision(client),'a':male['id'],'b':other[0]['id'],'kind':'cannot_share','severity':'hard'},headers=headers(owner));assert response.status_code==200
