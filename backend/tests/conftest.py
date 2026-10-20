@@ -20,6 +20,15 @@ def reset_identities():
         db.execute(text("TRUNCATE families, guests, assignments, room_locks, guest_links, room_connections, planning_rules, hotel_charge_days, meal_attendance, guest_presence, function_events, event_attendance, wedding_details CASCADE"))
         db.execute(text("UPDATE plan_state SET revision=1,cursor=NULL,redo='[]'::jsonb WHERE id=1"))
         db.execute(text("UPDATE planning_resources SET reserved=false,near_restaurant=false"))
+        db.execute(text("""UPDATE rooms SET number=substring(id from 3),
+            category=CASE WHEN id IN ('w-102','w-104','w-202','w-204','w-206','w-208',
+                'w-110','w-112','w-210','w-212','w-115','w-117','w-215','w-217',
+                'w-219','w-221','w-123','w-125','w-223','w-225') THEN 'superior' ELSE 'premium' END,
+            adult_capacity=CASE WHEN id IN ('w-102','w-104','w-202','w-204','w-206','w-208',
+                'w-110','w-112','w-210','w-212','w-115','w-117','w-215','w-217',
+                'w-219','w-221','w-123','w-125','w-223','w-225') THEN 3 ELSE 4 END
+            WHERE hotel_id='wyndham'"""))
+        db.execute(text("UPDATE rooms SET number=NULL WHERE hotel_id='second'"))
         db.execute(text("UPDATE event_policy SET wyndham_allowance=128,wyndham_excess_paise=500000,staff_meal_paise=15000,second_hotel_day_paise=1800000,second_hotel_included=12 WHERE id=1"))
         db.execute(text("UPDATE billing_settings SET guest_meals='{}'::jsonb,second_extra_paise=NULL WHERE id=1"))
 

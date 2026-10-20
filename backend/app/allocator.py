@@ -100,7 +100,7 @@ def allocate(data,time_limit=10):
         held=[]
         for rid,flags in premium_usage.items():
             used=model.new_bool_var('premium_any_'+rid);model.add_max_equality(used,flags);held.append(used)
-        model.add(sum(held)<=20)
+        model.add(sum(held)<=len(premium_usage)-4)
     for link in data['links']:
         if link['severity']!='hard' or link['kind'] not in {'nearby','same_building'} or link['a'] not in unit_for or link['b'] not in unit_for:continue
         i,j=unit_for[link['a']],unit_for[link['b']]
@@ -153,6 +153,9 @@ def allocate(data,time_limit=10):
     for (i,rid),var in variables.items():
         if solver.boolean_value(var):
             after.extend({'guest_id':g['id'],'night':n,'resource_id':rid} for g in units[i] for n in NIGHTS if active(g,n))
+    previous_beds={(a['guest_id'],a['night'],a['resource_id']) for a in old if a.get('separate_bed')}
+    for a in after:
+        if (a['guest_id'],a['night'],a['resource_id']) in previous_beds:a['separate_bed']=True
     after=sorted(after,key=lambda a:(a['night'],a['guest_id']))
     checked=validate(data,after,before=old)
     if checked['errors']:return {'solver_status':'unresolved','assignments':None,'diagnostics':[e['message'] for e in checked['errors'][:20]],'errors':checked['errors']}

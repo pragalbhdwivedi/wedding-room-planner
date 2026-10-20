@@ -45,9 +45,9 @@ def current_user(request: Request, db: Session = Depends(database)) -> User:
     return user
 
 
-def require_owner(user: User = Depends(current_user)) -> User:
-    if user.role != "owner":
-        raise HTTPException(403, "Only the owner can make changes")
+def require_editor(user: User = Depends(current_user)) -> User:
+    if user.role not in {"owner", "editor"}:
+        raise HTTPException(403, "Only an owner or editor can make changes")
     return user
 
 

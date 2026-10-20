@@ -55,11 +55,11 @@ Proposed preference order: accessibility and mandatory constraints, coupled/link
 
 Implemented foundation: username/password with Argon2id hashes, hashed server-side session tokens, HTTP-only SameSite cookies, CSRF checks, session expiry/revocation, persistent login throttling and no-store API responses. Private-key bootstrap creates the sole owner transactionally; there are no default credentials or public registration. Cookie security is enforced for production HTTPS; the loopback preview has an explicit local transport mode. Account recovery remains open.
 
-Only the one owner account may mutate planning/settings/access records. Family viewers have side scopes; reception has an operational field allowlist excluding costs. Scope API response schemas, event payloads, errors, and exports before transmission. No public guest-data endpoints or public self-registration.
+The protected owner account and explicitly granted full editors may mutate planning/settings/access records. Family viewers have side scopes; reception has an operational field allowlist excluding costs. Scope API response schemas, event payloads, errors, and exports before transmission. No public guest-data endpoints or public self-registration.
 
 ## Consistency and live views
 
-Use revision numbers for optimistic concurrency even though only one account edits: the owner may have multiple tabs/devices. Commit room moves/swaps atomically, including history and update notification records. Never show an optimistic move as saved until the server confirms it. Recovery/reconnect reloads current data; no promise of offline editing.
+Use revision numbers for optimistic concurrency across owner/editor tabs and devices. Commit room moves/swaps atomically, including history and update notification records. Never show an optimistic move as saved until the server confirms it. Recovery/reconnect reloads current data; no promise of offline editing.
 
 ## Docker deployment
 

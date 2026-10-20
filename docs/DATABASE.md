@@ -6,9 +6,9 @@ The foundation implements PostgreSQL with SQLAlchemy and Alembic. Migration `000
 
 | Tables | Main fields and relationships |
 | --- | --- |
-| users | UUID, username, password_hash, owner/viewer role, enabled, timestamps; exactly one designated owner |
+| users | UUID, username, password_hash, owner/editor/viewer role, enabled, timestamps; exactly one designated owner |
 | sessions | User, hashed session token, expiry/revocation, authentication metadata |
-| access_scopes | User, bride/groom/operational visibility, allowed fields and export permission; never grants another editor |
+| access_scopes | User, bride/groom/operational visibility, allowed fields and export permission; full editors see both sides and costs |
 | wedding_settings | Event dates/timezone, current revision, sole owner reference |
 | hotels | Stable ID, name, guest/staff category, rate-plan link |
 | blocks, floors | Property hierarchy, actual floor designation and access notes |
@@ -41,7 +41,7 @@ The canonical count is the set of guest slots, not family.declared_headcount plu
 
 ## Occupancy and money
 
-Store actual heads, adult-counted occupancy, child-sharing eligibility, extra-bed requests, and billing eligibility as distinct concepts. Calculate applicable policies from the guest's known age at the event. Rules can be versioned; do not overwrite a historical bill by silently changing a live rate.
+Store physical people, adult-counted occupancy, child-sharing eligibility, per-night separate-bed choice, and hotel-counted billing eligibility as distinct concepts. A child aged 10 or under is counted for accommodation only with an explicit separate bed on that night. Calculate applicable policies from the guest's known age at the event. Rules can be versioned; do not overwrite a historical bill by silently changing a live rate.
 
 Use integer paise for amounts, explicit units such as whole-property/day, person/night, or person/meal, and nullable amounts for unpriced items. INR 18,000 for six rooms must not become INR 18,000 per room. Derived totals are traceable to date, guests/services, and rate version. Keep proposed/estimated and actual/confirmed figures distinguishable.
 
@@ -70,7 +70,7 @@ Every schema change uses a reviewed migration, including a clean-database upgrad
 
 The earlier logical model is a design map. The deployed implementation uses `plan_state` for the transaction revision/history cursor; `families` and stable `guests` slots; `planning_resources` for room/bed flags and schematic positions; and `assignments` keyed by guest plus one of the two event nights. This fixed event does not implement arbitrary date-range stays. `room_locks`, `guest_links`, verified `room_connections`, and typed `planning_rules` feed the same validator used for manual previews, imports, history and solver application.
 
-`pending_changes` hold short-lived owner/revision-bound import or assignment previews. `plan_changes` and `bill_snapshots` are append-only to the runtime role. `allocation_runs` holds the private snapshot, lease/attempt state and reviewable result. `meal_attendance`, `guest_presence`, `function_events` and `event_attendance` distinguish planned meals/functions from actual attendance and actual arrival timestamps. `billing_settings` and explicit `hotel_charge_days` hold missing/provisional price inputs alongside the foundation `event_policy`. Source does not contain real runtime records.
+`pending_changes` hold short-lived actor/revision-bound import or assignment previews. `plan_changes` and `bill_snapshots` are append-only to the runtime role. `allocation_runs` holds the private snapshot, lease/attempt state and reviewable result. `meal_attendance`, `guest_presence`, `function_events` and `event_attendance` distinguish planned meals/functions from actual attendance and actual arrival timestamps. `billing_settings` and explicit `hotel_charge_days` hold missing/provisional price inputs alongside the foundation `event_policy`. Migration `0006_editors_child_beds` adds the full editor role and `assignments.separate_bed`; existing assignments default to no separate child bed until explicitly reviewed. Source does not contain real runtime records.
 
 The allocator uses CP-SAT in the separate worker, with whole-family units, hard domain/capacity/compatibility/lock constraints, and bounded preference scoring. Every returned proposal is validated again by the shared rules and accepted through the same revision-safe preview/apply path. SSE emits only a revision and session-expiry signal; entity data is fetched again through scoped endpoints. This release does not implement a transactional event outbox or arbitrary FET rule execution.
 

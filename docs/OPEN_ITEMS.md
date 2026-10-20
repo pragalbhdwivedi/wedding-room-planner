@@ -14,12 +14,13 @@ These remain open as of the 19 October 2026 baseline. Do not invent answers. Mos
 | O08 | Actual Wyndham carryover treatment | Owner-approved estimate uses no carryover; record as planning assumption, not hotel contract confirmation. |
 | O09 | Which people are drivers/staff/vendors and applicable meals | Owner tags later; planned/actual meal status remains explicit. |
 | O10 | Final side quotas/separation/mixed-room rules and solver weights | Configurable; do not silently impose equal halves or a universal split. Suggested scoring is proposed. |
-| O11 | Password recovery and real viewer account details | Private-key single-owner bootstrap is implemented. No shared/default/public credentials or public self-signup. Recovery remains open; owner creates viewers privately. |
+| O11 | Password recovery and future account details | Private-key single-owner bootstrap is implemented; separately granted full editors and scoped viewers use private credentials. No shared/default/public credentials or public self-signup. Recovery remains open. |
 | O12 | Exact family-view cost/contact/note visibility, reception fields and export permissions | Reception costs forbidden; family own-side scope confirmed. Apply least disclosure pending owner choices. |
 | O13 | Domain, ingress and HTTPS routing | The app trusts the exact public HTTPS origin with Secure cookies. The proxy now redirects HTTP to HTTPS; direct and public checks passed. The owner confirmed phone sign-in reached the room planner. Final event-use acceptance remains pending. |
 | O14 | Backup destination, retention, recovery targets, data retention after event | Owner explicitly deferred backup work under D26. No scheduled backup or recovery verification is claimed. |
 | O15 | Guest names, ages, contacts, headcounts and relationship tags | Enter privately later. Never request or publish these in public issues. |
 | O16 | Public software licence | None selected. Do not add an open-source licence automatically. |
+| O17 | Hotel confirmation and pricing for room-type changes | The owner can plan a Superior/Premium switch, but no hotel approval workflow or category-based price difference has been supplied. Do not label the hotel booking confirmed or change the bill automatically. |
 | O17 | Resolved pool behaviour; physical selection remains open | D35 authorises four unused Premium rooms across both nights. Exact family room numbers still await owner choice. |
 | O18 | Guest gender and friend classification | Owner enters these individually. Never infer gender from names; unspecified Friends are not automatically paired. |
 

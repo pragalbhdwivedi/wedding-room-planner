@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from sqlalchemy import select
 
 from .models import Family, Guest, PendingChange, now
-from .planning_api import ApplyInput, DB, GuestInput, Owner, Viewer, WRITE, billing_data, event_data, meal_rows, record
+from .planning_api import ApplyInput, DB, GuestInput, Editor, Viewer, WRITE, billing_data, event_data, meal_rows, record
 from .planning_rules import issue, validate
 from .planning_store import hard_check, locked_state, snapshot, visible_plan
 
@@ -36,9 +36,10 @@ def decorate(sheet):
 
 @router.get('/export.xlsx')
 def export(user:Viewer,db:DB,template:bool=False):
-    if template and user.role!='owner':raise HTTPException(403,'Only the owner can import guest templates')
+    editor=user.role in {'owner','editor'}
+    if template and not editor:raise HTTPException(403,'Only an owner or editor can import guest templates')
     data=visible_plan(db,user);workbook=Workbook();sheet=workbook.active;sheet.title='Guests'
-    headers=HEADERS if user.role=='owner' else [h for h in HEADERS if h not in ['Private notes','Reserved eligible','Couple with children'] and not (h=='Phone' and user.role=='family')]
+    headers=HEADERS if editor else [h for h in HEADERS if h not in ['Private notes','Reserved eligible','Couple with children'] and not (h=='Phone' and user.role=='family')]
     sheet.append(headers)
     families={f['id']:f for f in data['families']}
     if not template:
@@ -46,8 +47,8 @@ def export(user:Viewer,db:DB,template:bool=False):
             f=families[g['family_id']]
             row=dict(zip(HEADERS,[g['id'],g['family_id'],f['label'],g['side'],f['reserved_eligible'],f['couple_children'],g['name'],g['age'],g['category'],g.get('phone'),g['arrival'],', '.join(g['tags']),g.get('notes',''),g.get('age_band','unknown'),g.get('gender','unspecified'),g.get('sharing_mode','family')]))
             sheet.append([safe(row[h]) for h in headers])
-        assigned=workbook.create_sheet('Assignments');assigned.append(['Guest ID','Night','Room or bed ID'])
-        for a in data['assignments']:assigned.append([a['guest_id'],a['night'],a['resource_id']])
+        assigned=workbook.create_sheet('Assignments');assigned.append(['Guest ID','Night','Room or bed ID','Separate bed for child'])
+        for a in data['assignments']:assigned.append([a['guest_id'],a['night'],a['resource_id'],a.get('separate_bed',False)])
         rooms=workbook.create_sheet('Rooms');rooms.append(['ID','Property','Room number','Category','Floor','Reserved family'])
         for r in data['resources']:rooms.append([r['id'],r['hotel_id'],safe(r['number']),r['category'],r['floor'],r['reserved']])
         presence=workbook.create_sheet('Arrivals');presence.append(['Guest ID','Status']+(['Arrived at','Departed at'] if user.role!='family' else []))
@@ -56,9 +57,9 @@ def export(user:Viewer,db:DB,template:bool=False):
         for event in functions['events']:events.append([event['id'],safe(event['name']),event['day'],event['side'],event['start_time'],safe(event['venue']),safe(event['source_url'])])
         attended=workbook.create_sheet('Function attendance');attended.append(['Function ID','Guest ID','Planned','Actual'])
         for row in functions['rows']:attended.append([row[k] for k in ['event_id','guest_id','planned','actual']])
-        meals=workbook.create_sheet('Meals');meals.append(['Guest ID','Date','Meal','Location','Planned','Actual']+(['Inclusion'] if user.role=='owner' else []))
-        for row in meal_rows(db,{g['id'] for g in data['guests']}):meals.append([row[k] for k in ['guest_id','day','meal','location','planned','actual']]+([row['inclusion']] if user.role=='owner' else []))
-        if user.role=='owner':
+        meals=workbook.create_sheet('Meals');meals.append(['Guest ID','Date','Meal','Location','Planned','Actual']+(['Inclusion'] if editor else []))
+        for row in meal_rows(db,{g['id'] for g in data['guests']}):meals.append([row[k] for k in ['guest_id','day','meal','location','planned','actual']]+([row['inclusion']] if editor else []))
+        if editor:
             bill=billing_data(db);cost=workbook.create_sheet('Estimate');cost.append(['Day','Item','Quantity','Rate paise','Amount paise','Status'])
             for line in bill['lines']:cost.append([line.get('day'),line['kind'],line['quantity'],line['rate_paise'],line['amount_paise'],line['status']])
             cost.append(['','Known subtotal','','',bill['known_subtotal_paise'],'Estimate; unpriced items listed below'])
@@ -150,7 +151,7 @@ def parse_import(content,current):
 
 
 @router.post('/import/preview',dependencies=WRITE)
-async def import_preview(file:UploadFile,revision:int,user:Owner,db:DB):
+async def import_preview(file:UploadFile,revision:int,user:Editor,db:DB):
     if not file.filename or not file.filename.lower().endswith('.xlsx'):raise HTTPException(400,'Upload an .xlsx guest template')
     content=await file.read(5*1024*1024+1);await file.close()
     if len(content)>5*1024*1024:raise HTTPException(413,'Workbook exceeds the 5 MiB limit')
@@ -163,7 +164,7 @@ async def import_preview(file:UploadFile,revision:int,user:Owner,db:DB):
 
 
 @router.post('/import/apply',dependencies=WRITE)
-def apply_import(body:ApplyInput,user:Owner,db:DB):
+def apply_import(body:ApplyInput,user:Editor,db:DB):
     state=locked_state(db,body.revision);pending=db.get(PendingChange,body.token)
     if not pending or pending.kind!='import' or pending.owner_id!=user.id or pending.expires_at<=now() or pending.revision!=state.revision:raise HTTPException(409,'Import preview expired or changed; upload and preview again')
     if set(body.acknowledged)!={w['id'] for w in pending.warnings}:raise HTTPException(409,'Review and acknowledge the exact import warnings')

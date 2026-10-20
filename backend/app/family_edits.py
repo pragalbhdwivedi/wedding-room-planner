@@ -43,9 +43,10 @@ def repair_placements(before,data,fid):
         ids.update(g['id'] for g in data['guests'] if g['family_id'] in family_ids)
         if ids==prior:break
     baseline=[a for a in old if a['guest_id'] not in ids]
+    previous_beds={(a['guest_id'],a['night'],a['resource_id']) for a in old if a.get('separate_bed')}
     nights=[n for n in NIGHTS if any(a['guest_id'] in ids and a['night']==n for a in old)]
     def rows(rooms):
-        return sorted(baseline+[{'guest_id':g['id'],'night':n,'resource_id':rid} for n,rid in rooms.items() if rid for g in data['guests'] if g['id'] in ids and active(g,n)],key=lambda a:(a['night'],a['guest_id']))
+        return sorted(baseline+[{'guest_id':g['id'],'night':n,'resource_id':rid,**({'separate_bed':True} if (g['id'],n,rid) in previous_beds else {})} for n,rid in rooms.items() if rid for g in data['guests'] if g['id'] in ids and active(g,n)],key=lambda a:(a['night'],a['guest_id']))
     options={}
     for n in nights:
         people=[g for g in data['guests'] if g['id'] in ids and active(g,n)]

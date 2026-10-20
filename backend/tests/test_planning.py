@@ -104,6 +104,9 @@ def test_scope_no_cost_contact_or_mutation_leak(client,owner,role,side):
     assert viewer.post('/api/planning/families',json={'revision':d['revision'],'label':'Cannot Edit','side':'bride','members':[member()]},headers=h).status_code==403
     assert viewer.post('/api/planning/families/apply',json={'revision':d['revision'],'token':'00000000-0000-0000-0000-000000000001'},headers=h).status_code==403
     assert viewer.put('/api/planning/reservations',json={'revision':d['revision'],'room_ids':['w-101','w-103','w-201','w-203']},headers=h).status_code==403
+    assert viewer.put('/api/planning/rooms/w-102/category',json={'revision':d['revision'],'category':'premium'},headers=h).status_code==403
+    assert viewer.put('/api/planning/rooms/w-102/number',json={'revision':d['revision'],'number':'102A'},headers=h).status_code==403
+    assert viewer.put('/api/planning/assignments/'+bride[0]['id']+'/bed',json={'revision':d['revision'],'night':NIGHTS[0],'separate_bed':True},headers=h).status_code==403
     assert viewer.post('/api/planning/assignments/preview',json={'revision':d['revision'],'moves':[{'guest_id':bride[0]['id'],'night':NIGHTS[0],'resource_id':'w-104'}]},headers=h).status_code==403
     if role=='family':
         expected=bride if side=='bride' else groom;other=groom if side=='bride' else bride
@@ -119,13 +122,66 @@ def test_scope_no_cost_contact_or_mutation_leak(client,owner,role,side):
     if role=='family':assert other[0]['name'] not in values and 'CONTACT' not in values
 
 
+def test_editor_can_manage_accounts_guests_rooms_and_costs(client,owner):
+    created=client.post('/api/users',json={'username':'synthetic.editor','display_name':'Synthetic Editor','password':PASSWORD,'role':'family','side':'bride'},headers=headers(owner))
+    assert created.status_code==201,created.text
+    viewer=TestClient(app)
+    assert viewer.post('/api/auth/login',json={'username':'synthetic.editor','password':PASSWORD}).status_code==200
+    promoted=client.patch('/api/users/'+created.json()['id'],json={'version':created.json()['version'],'display_name':'Synthetic Editor','role':'editor','side':None,'active':True},headers=headers(owner))
+    assert promoted.status_code==200,promoted.text
+    assert viewer.get('/api/auth/me').status_code==401
+    editor=TestClient(app)
+    login=editor.post('/api/auth/login',json={'username':'synthetic.editor','password':PASSWORD})
+    assert login.status_code==200 and login.json()['user']['role']=='editor'
+    auth=login.json()
+    assert editor.get('/api/users').status_code==200
+    assert editor.get('/api/planning/billing').status_code==200
+    policy=editor.get('/api/planning/billing').json()['policy']
+    rate=editor.put('/api/planning/billing/rates',json={'revision':revision(editor),**policy,'guest_meals':{},'second_extra_paise':None,'charge_days':[]},headers=headers(auth))
+    assert rate.status_code==200,rate.text
+    assert 'Estimate' in load_workbook(io.BytesIO(editor.get('/api/planning/export.xlsx').content)).sheetnames
+    people=family(editor,auth,[member('Synthetic editor guest')])
+    assign(editor,auth,people,'w-102')
+    changed=editor.put('/api/planning/rooms/w-102/number',json={'revision':revision(editor),'number':'102-editor'},headers=headers(auth))
+    assert changed.status_code==200,changed.text
+    added=editor.post('/api/users',json={'username':'synthetic.more','display_name':'Synthetic Viewer','password':PASSWORD,'role':'reception','side':None},headers=headers(auth))
+    assert added.status_code==201,added.text
+    assert editor.get('/api/planning').json()['resources']
+    editor.close();viewer.close()
+
+
+def test_child_counts_only_with_explicit_bed_for_each_night(client,owner):
+    people=family(client,owner,[member('Synthetic Parent A',31),member('Synthetic Parent B',32),member('Synthetic Child',10)],couple_children=True)
+    for night in NIGHTS:assign(client,owner,people,'w-102',night)
+    child=next(person for person in people if person['age']==10)
+    first=plan(client)
+    assert first['summary'][NIGHTS[0]]['hotel_guests']==2 and first['summary'][NIGHTS[0]]['uncounted_children']==1
+    assert first['summary'][NIGHTS[0]]['residents']==3 and first['summary'][NIGHTS[0]]['extra_bedding']==0
+    assert all(client.get('/api/planning/billing').json()['nights'][n]['chargeable']==2 for n in NIGHTS)
+    bed=client.put('/api/planning/assignments/'+child['id']+'/bed',json={'revision':revision(client),'night':NIGHTS[0],'separate_bed':True},headers=headers(owner))
+    assert bed.status_code==200,bed.text
+    current=plan(client)
+    assert current['summary'][NIGHTS[0]]['hotel_guests']==3 and current['summary'][NIGHTS[0]]['extra_bedding']==1
+    assert current['summary'][NIGHTS[1]]['hotel_guests']==2 and current['summary'][NIGHTS[1]]['extra_bedding']==0
+    assert client.get('/api/planning/billing').json()['nights'][NIGHTS[0]]['chargeable']==3
+    book=load_workbook(io.BytesIO(client.get('/api/planning/export.xlsx').content))
+    assert any(row[0]==child['id'] and row[1]==NIGHTS[0] and row[3] is True for row in book['Assignments'].values)
+    assert client.put('/api/planning/assignments/'+child['id']+'/bed',json={'revision':current['revision']-1,'night':NIGHTS[0],'separate_bed':False},headers=headers(owner)).status_code==409
+    moved=preview(client,owner,[child],'w-104')
+    assert apply(client,owner,moved).status_code==200
+    assert not next(a for a in plan(client)['assignments'] if a['guest_id']==child['id'] and a['night']==NIGHTS[0]).get('separate_bed',False)
+    assert plan(client)['summary'][NIGHTS[0]]['hotel_guests']==2
+    adult=next(person for person in people if person['age']==31)
+    assert client.put('/api/planning/assignments/'+adult['id']+'/bed',json={'revision':revision(client),'night':NIGHTS[0],'separate_bed':True},headers=headers(owner)).status_code==400
+
+
 def test_reservations_capacity_children_bedding_and_ground_floor(client,owner):
     young=family(client,owner,[member('Synthetic Parent A',35),member('Synthetic Parent B',34),member('Synthetic Child A',10),member('Synthetic Child B',4)],couple_children=True)
     assert any(e['code']=='couple_children' for e in preview(client,owner,young,'w-105')['errors'])
     reserve(client,owner)
     assert any(e['code']=='couple_children' for e in preview(client,owner,young,'w-105')['errors'])
     assign(client,owner,young,'w-102')
-    s=plan(client)['summary'][NIGHTS[0]];assert s['assigned']==4 and s['extra_bedding']==1
+    s=plan(client)['summary'][NIGHTS[0]];assert s['assigned']==4 and s['hotel_guests']==2 and s['extra_bedding']==0
     older=family(client,owner,[member('Synthetic Elder',50)],label='Elder')
     assert any(e['code']=='ground_floor' for e in preview(client,owner,older,'w-202')['errors'])
     assign(client,owner,older,'w-104')
@@ -312,6 +368,10 @@ def test_money_nights_staff_meals_ages_and_unknown_prices():
     result=calculate(data,policy,settings,[],[]);assert sum(l['amount_paise'] for l in result['lines'] if l['kind']=='wyndham_excess')==3000000
     data['guests'][0]['age']=10;data['guests'][1]['age']=11
     assert calculate(data,policy,settings,[],[])['nights'][NIGHTS[0]]['chargeable']==131
+    data['assignments'][0]['separate_bed']=True
+    counted=calculate(data,policy,settings,[],[])['nights']
+    assert counted[NIGHTS[0]]['chargeable']==132 and counted[NIGHTS[1]]['chargeable']==129
+    data['assignments'][0].pop('separate_bed')
     staff=[{'id':'staff'+str(i),'age':30,'arrival':None,'category':'staff'} for i in range(5)];data['guests']+=staff
     meals=[{'guest_id':g['id'],'day':NIGHTS[0],'meal':meal,'location':'wyndham','planned':True,'actual':None,'inclusion':'chargeable'} for g in staff for meal in ['lunch','dinner']]
     priced=calculate(data,policy,settings,meals,[])
@@ -323,6 +383,9 @@ def test_money_nights_staff_meals_ages_and_unknown_prices():
     for i in range(13):data['assignments'][i]['resource_id']='s'
     hotel=calculate(data,policy,settings,meals,list(NIGHTS))
     assert sum(l['amount_paise'] for l in hotel['lines'] if l['kind']=='second_hotel_property')==3600000
+    assert not any(u['kind']=='second_extra' for u in hotel['unpriced'])
+    data['assignments'][0]['separate_bed']=True
+    hotel=calculate(data,policy,settings,meals,list(NIGHTS))
     assert any(u['kind']=='second_extra' and u['quantity']==1 for u in hotel['unpriced']) and not hotel['complete']
 
 
@@ -464,6 +527,68 @@ def test_unnamed_reserve_pool_is_shared_across_nights_and_solver_preserves_four(
     assert len({a['resource_id'] for a in result['assignments']})<=20
     assert len(result['unassigned'])==2 and not validate(data,result['assignments'])['errors']
     assert sum(r['id'] not in {a['resource_id'] for a in result['assignments']} for r in premium)>=4
+
+
+def test_room_upgrade_downgrade_updates_capacity_without_invalidating_placements(client,owner):
+    room=lambda rid:next(r for r in plan(client)['resources'] if r['id']==rid)
+    before=revision(client)
+    upgraded=client.put('/api/planning/rooms/w-102/category',json={'revision':before,'category':'premium'},headers=headers(owner))
+    assert upgraded.status_code==200,upgraded.text
+    assert room('w-102')['category']=='premium' and room('w-102')['adult_capacity']==4
+    assert next(r for r in client.get('/api/inventory').json()['rooms'] if r['id']=='w-102')['adult_capacity']==4
+    people=family(client,owner,[member(f'Synthetic adult {i}') for i in range(4)])
+    assign(client,owner,people,'w-102')
+    current=revision(client)
+    rejected=client.put('/api/planning/rooms/w-102/category',json={'revision':current,'category':'superior'},headers=headers(owner))
+    assert rejected.status_code==409 and 'capacity' in rejected.text
+    assert revision(client)==current and room('w-102')['adult_capacity']==4
+    assert client.put('/api/planning/rooms/w-102/category',json={'revision':current-1,'category':'superior'},headers=headers(owner)).status_code==409
+    assert client.put('/api/planning/rooms/second-0-1/category',json={'revision':current,'category':'premium'},headers=headers(owner)).status_code==400
+    assert client.put('/api/planning/rooms/w-102/category',json={'revision':current,'category':'premium'},headers=headers(owner)).status_code==400
+
+
+def test_room_downgrade_keeps_four_premium_reserve_and_named_reservation(client,owner):
+    first=client.put('/api/planning/rooms/w-103/category',json={'revision':revision(client),'category':'superior'},headers=headers(owner))
+    assert first.status_code==200,first.text
+    data=plan(client)
+    assert sum(r['category']=='premium' and r['hotel_id']=='wyndham' for r in data['resources'])==23
+    assert next(r for r in data['resources'] if r['id']=='w-103')['adult_capacity']==3
+    premium=[r for r in data['resources'] if r['hotel_id']=='wyndham' and r['category']=='premium']
+    data['resources']=premium
+    data['families']=[];data['guests']=[]
+    for i in range(20):
+        fid=f'synthetic-family-{i}';gid=f'synthetic-person-{i}'
+        data['families'].append({'id':fid,'label':fid,'side':'bride','reserved_eligible':False,'couple_children':False})
+        data['guests'].append({'id':gid,'family_id':fid,'name':None,'age':30,'age_band':'adult','side':'bride','reserved_eligible':False,'couple_children':False,'category':'guest','arrival':NIGHTS[0],'tags':[]})
+    rows=[{'guest_id':g['id'],'night':NIGHTS[0],'resource_id':premium[i]['id']} for i,g in enumerate(data['guests'])]
+    assert any(e['code']=='reserve_pool' for e in validate(data,rows)['errors'])
+    proposal=allocate(data)
+    premium_ids={r['id'] for r in premium}
+    assert proposal['assignments'] is not None and len({a['resource_id'] for a in proposal['assignments'] if a['resource_id'] in premium_ids})<=19
+    assert len(proposal['unassigned'])==2
+    reserve(client,owner,['w-101','w-201','w-203','w-105'])
+    rejected=client.put('/api/planning/rooms/w-101/category',json={'revision':revision(client),'category':'superior'},headers=headers(owner))
+    assert rejected.status_code==409 and 'family reservation' in rejected.text
+
+
+def test_room_number_change_keeps_assignment_identity_and_rejects_duplicates(client,owner):
+    people=family(client,owner,[member()])
+    assign(client,owner,people,'w-102')
+    old=revision(client)
+    renamed=client.put('/api/planning/rooms/w-102/number',json={'revision':old,'number':' 102A '},headers=headers(owner))
+    assert renamed.status_code==200,renamed.text
+    data=plan(client)
+    assert next(r for r in data['resources'] if r['id']=='w-102')['number']=='102A'
+    assert next(r for r in client.get('/api/inventory').json()['rooms'] if r['id']=='w-102')['number']=='102A'
+    assert data['assignments']==[{'guest_id':people[0]['id'],'night':NIGHTS[0],'resource_id':'w-102'}]
+    assert data['revision']==old+1
+    for number,status in [('104',409),('',400),('102A',400)]:
+        r=client.put('/api/planning/rooms/w-102/number',json={'revision':data['revision'],'number':number},headers=headers(owner))
+        assert r.status_code==status,r.text
+    assert revision(client)==data['revision']
+    second=client.put('/api/planning/rooms/second-0-1/number',json={'revision':data['revision'],'number':'Annex 1'},headers=headers(owner))
+    assert second.status_code==200,second.text
+    assert next(r for r in plan(client)['resources'] if r['id']=='second-0-1')['number']=='Annex 1'
 
 
 def test_automatic_pool_allocation_applies_and_is_not_reported_stale(client,owner):

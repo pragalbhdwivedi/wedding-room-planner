@@ -42,7 +42,7 @@ import "./planning.css";
 
 type Viewer = {
   id: string;
-  role: "owner" | "family" | "reception";
+  role: "owner" | "editor" | "family" | "reception";
   side: "bride" | "groom" | null;
 };
 type Family = {
@@ -83,7 +83,7 @@ type Resource = {
   x: number;
   y: number;
 };
-type Assignment = { guest_id: string; night: string; resource_id: string };
+type Assignment = { guest_id: string; night: string; resource_id: string; separate_bed?: boolean };
 type Warning = {
   id: string;
   message: string;
@@ -396,7 +396,7 @@ function RoomNode({ data }: { data: RoomData }) {
 const nodeTypes = { room: RoomNode as any };
 
 export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
-  const owner = user.role === "owner";
+  const owner = user.role === "owner" || user.role === "editor";
   const [data, setData] = useState<Plan | null>(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
@@ -1508,7 +1508,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
       {page === "guests" && (
         <>
           <div className="guest-total">
-            <b>{data.guests.length}</b> guest slots · {data.families.length}{" "}
+            <b>{data.guests.length}</b> people in roster · {data.families.length}{" "}
             families/groups · {data.guests.filter((g) => g.age === null).length}{" "}
             ages to complete
             {owner && (
@@ -2061,9 +2061,11 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
               <span className="eyebrow">THE NIGHT AT A GLANCE</span>
               <h2>{dayName(night)}</h2>
               {[
-                ["Resident people", summary.residents],
-                ["Assigned", summary.assigned],
-                ["Unassigned", summary.unassigned],
+                ["Hotel guests counted", summary.hotel_guests],
+                ["Young children without beds", summary.uncounted_children],
+                ["People staying", summary.residents],
+                ["People assigned", summary.assigned],
+                ["People unassigned", summary.unassigned],
                 ["Rooms used", summary.used_rooms],
                 ["Wyndham used / 44", summary.properties.wyndham.used],
                 [
@@ -2099,7 +2101,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                 ["Unnamed reserve pool", data.reserve_pool],
                 ["Exact ages pending", summary.unconfirmed_ages],
                 ["Staff beds used", summary.staff_beds_used],
-                ["Extra bedding", summary.extra_bedding],
+                ["Extra beds needed", summary.extra_bedding],
               ].map(([k, v]) => (
                 <div className="live-summary-row" key={String(k)}>
                   <span>{k}</span>
@@ -2422,18 +2424,18 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
               <div className="settings-card" key={n}>
                 <h2>{dayName(n)} · Wyndham</h2>
                 <div className="live-summary-row">
-                  <span>Actual resident heads</span>
+                  <span>Hotel guests counted</span>
                   <b>{bill.nights[n].wyndham_heads}</b>
                 </div>
                 <div className="live-summary-row">
-                  <span>Chargeable adults / allowance</span>
+                  <span>Adults and children with beds / allowance</span>
                   <b>
                     {bill.nights[n].chargeable} /{" "}
                     {bill.policy.wyndham_allowance}
                   </b>
                 </div>
                 <div className="live-summary-row">
-                  <span>Excess residents</span>
+                  <span>Excess hotel guests</span>
                   <b>{bill.nights[n].excess}</b>
                 </div>
                 <strong>{money(bill.nights[n].excess_paise)}</strong>
@@ -2905,7 +2907,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                       </p>
                     )}
                     <label>
-                      Private owner note
+                      Private editor note
                       <textarea
                         maxLength={2000}
                         value={g.notes}
@@ -3199,14 +3201,92 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                   a.night === night,
               ),
             )
-            .map((g) => (
-              <p className="room-person-detail" key={g.id}>
-                {guestName(g)} ·{" "}
-                {g.age === null ? "Unknown age" : g.age + " years"}
-              </p>
-            ))}
+            .map((g) => {
+              const assignment = data.assignments.find(
+                (a) => a.guest_id === g.id && a.resource_id === details.id && a.night === night,
+              );
+              const youngChild = g.category === "guest" && (g.age !== null ? g.age <= 10 : g.age_band === "child");
+              return (
+                <div key={g.id}>
+                  <p className="room-person-detail">
+                    {guestName(g)} · {g.age === null ? "Age unconfirmed" : g.age + " years"}
+                  </p>
+                  {youngChild && details.hotel_id !== "staff" && (
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={!!assignment?.separate_bed}
+                        disabled={!owner || busy}
+                        onChange={async (e) => {
+                          const result = await action(
+                            "/assignments/" + g.id + "/bed",
+                            { revision: data.revision, night, separate_bed: e.target.checked },
+                            "PUT",
+                          );
+                          if (result) setNotice("Separate bed updated for " + dayName(night) + ".");
+                        }}
+                      />
+                      Separate bed for {dayName(night)} · counts toward hotel guests
+                    </label>
+                  )}
+                </div>
+              );
+            })}
           {owner && (
             <>
+              {details.hotel_id === "wyndham" && (
+                <div className="room-category-action">
+                  <p className="form-help">
+                    Changing room type updates the adult capacity for both nights.
+                    Existing placements and the four-room Premium reserve must remain valid.
+                    Confirm any actual room change with the hotel separately.
+                  </p>
+                  <button
+                    type="button"
+                    className="secondary compact"
+                    disabled={busy}
+                    onClick={async () => {
+                      const target = details.category === "superior" ? "premium" : "superior";
+                      const result = await action(
+                        "/rooms/" + details.id + "/category",
+                        { revision: data.revision, category: target },
+                        "PUT",
+                      );
+                      if (result) setDetails(null);
+                    }}
+                  >
+                    {details.category === "superior" ? "Upgrade to Premium" : "Downgrade to Superior"}
+                  </button>
+                </div>
+              )}
+              {details.hotel_id !== "staff" && (
+                <form
+                  className="room-number-action"
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const form = new FormData(e.currentTarget);
+                    const result = await action(
+                      "/rooms/" + details.id + "/number",
+                      { revision: data.revision, number: String(form.get("room-number") || "").trim() || null },
+                      "PUT",
+                    );
+                    if (result) setDetails(null);
+                  }}
+                >
+                  <label>
+                    Room number
+                    <input
+                      name="room-number"
+                      maxLength={16}
+                      required={details.hotel_id === "wyndham"}
+                      defaultValue={details.number || ""}
+                    />
+                  </label>
+                  <button type="submit" className="secondary compact" disabled={busy}>
+                    Change room number
+                  </button>
+                </form>
+              )}
               <div className="dialog-actions">
                 <button
                   type="button"
@@ -3278,7 +3358,6 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                     "/rooms/" + details.id,
                     {
                       revision: data.revision,
-                      number: form.get("number") || null,
                       near_restaurant: form.get("restaurant") === "on",
                     },
                     "PUT",
@@ -3286,16 +3365,6 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                   if (r) setDetails(null);
                 }}
               >
-                {details.hotel_id === "second" && (
-                  <label>
-                    Confirmed room number
-                    <input
-                      name="number"
-                      maxLength={16}
-                      defaultValue={details.number || ""}
-                    />
-                  </label>
-                )}
                 <label className="checkbox-label">
                   <input
                     name="restaurant"
@@ -3459,7 +3528,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                 >
                   <option value="hard">Mandatory · cannot override</option>
                   <option value="warning">
-                    Warning · owner review required
+                    Warning · editor review required
                   </option>
                 </select>
               </label>
@@ -3610,7 +3679,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                   }
                 >
                   <option value="hard">Mandatory</option>
-                  <option value="warning">Warning with owner review</option>
+                  <option value="warning">Warning with editor review</option>
                 </select>
               </label>
             </div>

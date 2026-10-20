@@ -31,14 +31,14 @@ The owner requested this public repository on 19 October 2026 (Asia/Kolkata) to 
 
 A phone- and laptop-friendly room planner with a hotel topology canvas, individual/family drag-and-drop, automatic initial assignment, rule validation, room locks, attendance, costs, Excel import/export, and live updates.
 
-Only the owner's application login may change planning data or settings. Family and reception accounts are view-only, with separate visibility scopes. Reception must never receive cost data.
+The owner and full-access editors may change planning data, rates and users. Family and reception accounts are view-only, with separate visibility scopes. Reception must never receive cost data.
 
 ## Inventory and policies
 
-- Wyndham: 44 rooms; 40 general guest rooms and four Premium rooms reserved for family.
+- Wyndham: 44 rooms; 40 general guest rooms and four Premium rooms reserved for family. The initial workbook split is 20 Superior / 24 Premium; the owner can plan individual room upgrades or downgrades.
 - Separate hotel: six rooms, each accommodating up to four adults.
 - Separate staff dormitory: 12 free beds; mandatory separation from guest accommodation.
-- Wyndham package: 120 + 8 complimentary guests per night, including family-room occupants.
+- Wyndham package: 120 + 8 complimentary counted guests per night, including family-room occupants. Children aged 10 or under enter that count only when a separate bed is explicitly assigned for that night.
 - Wyndham excess residents: INR 5,000 per chargeable person per night, including food and all taxes; no carryover assumed.
 - Driver/staff/vendor meals: INR 150 per person per meal.
 - Second-hotel estimate: INR 18,000 per day for all six rooms and 12 guests with breakfast; unsettled estimate, not a confirmed contract.

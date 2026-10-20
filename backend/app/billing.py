@@ -1,5 +1,5 @@
 """Exact-pa​ise estimates with explicit missing-price and coverage boundaries."""
-from .planning_rules import DAYS, NIGHTS, STAFF, active, age_band, is_adult
+from .planning_rules import DAYS, NIGHTS, STAFF, active, age_band, counted_hotel_guest, is_adult
 
 
 def calculate(snapshot, policy, settings, meals, charge_days, *, basis="planned"):
@@ -8,23 +8,26 @@ def calculate(snapshot, policy, settings, meals, charge_days, *, basis="planned"
     rows=snapshot["assignments"]
     lines=[];unpriced=[];night_totals={}
     for night in NIGHTS:
-        located={a["guest_id"]:resources[a["resource_id"]] for a in rows if a["night"]==night}
-        wyndham=[guests[g] for g,r in located.items() if r["hotel_id"]=="wyndham"]
-        adults=sum(is_adult(g) for g in wyndham)
+        night_rows=[a for a in rows if a["night"]==night]
+        located={a["guest_id"]:resources[a["resource_id"]] for a in night_rows}
+        wyndham_rows=[a for a in night_rows if resources[a["resource_id"]]["hotel_id"]=="wyndham"]
+        wyndham=[guests[a["guest_id"]] for a in wyndham_rows]
+        counted=sum(counted_hotel_guest(guests[a["guest_id"]],a) for a in wyndham_rows)
         unknown=sum(age_band(g)=="unknown" for g in wyndham)
-        excess=max(0,adults-policy["wyndham_allowance"])
+        excess=max(0,counted-policy["wyndham_allowance"])
         amount=excess*policy["wyndham_excess_paise"]
         lines.append({"day":night,"kind":"wyndham_excess","quantity":excess,"rate_paise":policy["wyndham_excess_paise"],"amount_paise":amount,"status":"planning_assumption"})
-        second=sum(r["hotel_id"]=="second" for r in located.values())
+        second_rows=[a for a in night_rows if resources[a["resource_id"]]["hotel_id"]=="second"]
+        second=sum(counted_hotel_guest(guests[a["guest_id"]],a) for a in second_rows)
         extra=max(0,second-policy["second_hotel_included"])
         if extra:
             if settings["second_extra_paise"] is None:unpriced.append({"day":night,"kind":"second_extra","quantity":extra,"reason":"Second-hotel extra-person rate is not supplied."})
             else:lines.append({"day":night,"kind":"second_extra","quantity":extra,"rate_paise":settings["second_extra_paise"],"amount_paise":extra*settings["second_extra_paise"],"status":"owner_entered_estimate"})
-        if second and night not in charge_days:unpriced.append({"day":night,"kind":"second_day","quantity":second,"reason":"Confirm the second-hotel billable-day mapping; daily rate is provisional."})
+        if second_rows and night not in charge_days:unpriced.append({"day":night,"kind":"second_day","quantity":len(second_rows),"reason":"Confirm the second-hotel billable-day mapping; daily rate is provisional."})
         unassigned=sum(active(g,night) and g["id"] not in located for g in guests.values())
         if unassigned:unpriced.append({"day":night,"kind":"unassigned","quantity":unassigned,"reason":"Residents are unassigned; hotel-specific costs cannot yet be finalised."})
         if unknown:unpriced.append({"day":night,"kind":"age_unknown","quantity":unknown,"reason":"Chargeable ages are unresolved."})
-        night_totals[night]={"wyndham_heads":len(wyndham),"chargeable":adults,"unknown_ages":unknown,"excess":excess,"excess_paise":amount,"second_heads":second,"unassigned":unassigned}
+        night_totals[night]={"wyndham_heads":counted,"wyndham_people":len(wyndham),"chargeable":counted,"unknown_ages":unknown,"excess":excess,"excess_paise":amount,"second_heads":second,"second_people":len(second_rows),"unassigned":unassigned}
     for day in sorted(charge_days):
         lines.append({"day":day,"kind":"second_hotel_property","quantity":1,"rate_paise":policy["second_hotel_day_paise"],"amount_paise":policy["second_hotel_day_paise"],"status":"provisional"})
     for attendance in meals:

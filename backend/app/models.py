@@ -26,7 +26,7 @@ class User(Base):
     version: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     __table_args__ = (
-        CheckConstraint("role IN ('owner','family','reception')", name="user_role"),
+        CheckConstraint("role IN ('owner','editor','family','reception')", name="user_role"),
         CheckConstraint("(role = 'family' AND side IS NOT NULL AND side IN ('bride','groom')) OR (role <> 'family' AND side IS NULL)", name="user_scope"),
         CheckConstraint("role <> 'owner' OR active", name="owner_active"),
         Index("one_owner", "role", unique=True, postgresql_where=text("role = 'owner'")),
@@ -150,6 +150,7 @@ class Assignment(Base):
     guest_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("guests.id"), primary_key=True)
     night: Mapped[object] = mapped_column(Date, primary_key=True)
     resource_id: Mapped[str] = mapped_column(ForeignKey("planning_resources.id"), index=True)
+    separate_bed: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
 
 
 class RoomLock(Base):

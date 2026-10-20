@@ -15,6 +15,10 @@ def age_band(guest):
 def is_adult(guest):return age_band(guest)=="adult"
 
 
+def counted_hotel_guest(guest, assignment):
+    return guest["category"]=="guest" and (is_adult(guest) or age_band(guest)=="child" and assignment.get("separate_bed",False))
+
+
 def is_friend(guest):
     return guest.get('sharing_mode')=='friends' and guest['category']=='guest' and is_adult(guest) and not guest.get('couple_children',False)
 
@@ -124,7 +128,8 @@ def validate(snapshot, assignments, *, before=None):
             if not compatible(a,b,links):result.append(issue("compatibility", "Friends share only with the same specified gender and side. Other unrelated guests need explicit sharing compatibility; mandatory exclusions remain enforced.", guests=[a["id"],b["id"]], resources=[rid],night=night))
     if snapshot["reserved_count"]==0:
         premium={a['resource_id'] for a in assignments if a['resource_id'] in resources and resources[a['resource_id']]['hotel_id']=='wyndham' and resources[a['resource_id']]['category']=='premium'}
-        if len(premium)>20:result.append(issue('reserve_pool','Four Premium rooms must stay unused across both nights until named family rooms are chosen.',resources=premium))
+        premium_count=sum(r['hotel_id']=='wyndham' and r['category']=='premium' for r in resources.values())
+        if len(premium)>premium_count-4:result.append(issue('reserve_pool','Four Premium rooms must stay unused across both nights until named family rooms are chosen.',resources=premium))
     rosters=friend_rosters(snapshot)
     for night in NIGHTS:
         for family in snapshot["families"]:
@@ -169,7 +174,8 @@ def summaries(snapshot, assignments, guest_ids=None):
     out={}
     for night in NIGHTS:
         residents=[g for g in selected if active(g,night)]
-        rows=[a for a in assignments if a["night"]==night and a["guest_id"] in {g["id"] for g in residents}]
+        guest_map={g["id"]:g for g in residents}
+        rows=[a for a in assignments if a["night"]==night and a["guest_id"] in guest_map]
         used={a["resource_id"] for a in rows}
         regular={r for r in used if resources[r]["hotel_id"]!="staff"}
         sides={side:len({a["resource_id"] for a in rows if any(g["id"]==a["guest_id"] and g["side"]==side for g in residents) and resources[a["resource_id"]]["hotel_id"]!="staff"}) for side in ["bride","groom"]}
@@ -177,9 +183,11 @@ def summaries(snapshot, assignments, guest_ids=None):
         for rid in regular:
             people=[g for g in residents if any(a["guest_id"]==g["id"] and a["resource_id"]==rid for a in rows)]
             extra=max(0,sum(is_adult(g) for g in people)-2)
-            if any(g["couple_children"] and age_band(g)=="child" for g in people):extra=max(1,extra)
+            extra+=sum(a.get("separate_bed",False) for a in rows if a["resource_id"]==rid and age_band(guest_map[a["guest_id"]])=="child")
             bedding+=extra;mixed+=len({g["side"] for g in people})>1
-        out[night]={"residents":len(residents),"assigned":len(rows),"unassigned":len(residents)-len(rows),"used_rooms":len(regular),"free_rooms":50-len(regular),"reserved":snapshot["reserved_count"],"side_rooms":sides,"mixed_rooms":mixed,"staff_beds_used":sum(resources[r]["hotel_id"]=="staff" for r in used),"extra_bedding":bedding}
+        hotel_rows=[a for a in rows if resources[a["resource_id"]]["hotel_id"]!="staff"]
+        counted=sum(counted_hotel_guest(guest_map[a["guest_id"]],a) for a in hotel_rows)
+        out[night]={"residents":len(residents),"assigned":len(rows),"unassigned":len(residents)-len(rows),"hotel_guests":counted,"uncounted_children":sum(age_band(guest_map[a["guest_id"]])=="child" and not a.get("separate_bed",False) for a in hotel_rows),"used_rooms":len(regular),"free_rooms":50-len(regular),"reserved":snapshot["reserved_count"],"side_rooms":sides,"mixed_rooms":mixed,"staff_beds_used":sum(resources[r]["hotel_id"]=="staff" for r in used),"extra_bedding":bedding}
         out[night]["properties"]={hotel:{"used":sum(resources[r]["hotel_id"]==hotel for r in regular),"empty":capacity-sum(resources[r]["hotel_id"]==hotel for r in regular)} for hotel,capacity in [("wyndham",44),("second",6)]}
         out[night]["unconfirmed_ages"]=sum(g["age"] is None for g in residents)
         out[night]["reserve_pool"]=4 if snapshot["reserved_count"]==0 else 0

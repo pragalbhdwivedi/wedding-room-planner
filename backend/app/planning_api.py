@@ -18,11 +18,11 @@ from .models import (AllocationRun, Assignment, Audit, BillSnapshot, BillingSett
                      PlanningRule, Resource, Room, RoomConnection, RoomLock, User, WeddingDetails, now)
 from .planning_rules import DAYS, NIGHTS, issue, validate
 from .planning_store import assignments, hard_check, locked_state, save_assignments, snapshot, visible_plan
-from .security import COOKIE, current_user, digest, require_csrf, require_owner
+from .security import COOKIE, current_user, digest, require_csrf, require_editor
 
 router=APIRouter(prefix="/api/planning")
 DB=Annotated[object,Depends(database)]
-Owner=Annotated[User,Depends(require_owner)]
+Editor=Annotated[User,Depends(require_editor)]
 Viewer=Annotated[User,Depends(current_user)]
 WRITE=[Depends(require_csrf)]
 
@@ -104,7 +104,7 @@ def get_plan(user:Viewer,db:DB):return visible_plan(db,user)
 
 
 @router.post("/families",dependencies=WRITE,status_code=201)
-def create_family(body:FamilyInput,user:Owner,db:DB):
+def create_family(body:FamilyInput,user:Editor,db:DB):
     state=locked_state(db,body.revision)
     if len(snapshot(db)["guests"])+len(body.members)>1000:raise HTTPException(400,"The current event supports up to 1,000 guest slots.")
     family=Family(label=body.label,side=body.side,reserved_eligible=body.reserved_eligible,couple_children=body.couple_children)
@@ -129,7 +129,7 @@ def _members(db,family,members,creating=False):
 
 
 @router.put("/families/{family_id}",dependencies=WRITE)
-def update_family(family_id:uuid.UUID,body:FamilyInput,user:Owner,db:DB):
+def update_family(family_id:uuid.UUID,body:FamilyInput,user:Editor,db:DB):
     state=locked_state(db,body.revision);before=snapshot(db)
     if not db.get(Family,family_id):raise HTTPException(404,"Family/group not found")
     draft=body.model_dump(mode='json');existing={g['id']:g for g in before['guests']}
@@ -186,7 +186,7 @@ def persist_family_edit(db,payload):
 
 
 @router.post('/families/apply',dependencies=WRITE)
-def apply_family_edit(body:ApplyInput,user:Owner,db:DB):
+def apply_family_edit(body:ApplyInput,user:Editor,db:DB):
     state=locked_state(db,body.revision);pending=db.get(PendingChange,body.token)
     if not pending or pending.kind!='family_edit' or pending.owner_id!=user.id or pending.revision!=state.revision or pending.expires_at<=now():raise HTTPException(409,'This guest-edit preview changed or expired. Review the edit again.')
     before=snapshot(db);old={w['id'] for w in validate(before,before['assignments'])['warnings']}
@@ -212,7 +212,7 @@ class Reservations(Revision):room_ids:list[str]=Field(max_length=4)
 
 
 @router.put("/reservations",dependencies=WRITE)
-def reservations(body:Reservations,user:Owner,db:DB):
+def reservations(body:Reservations,user:Editor,db:DB):
     state=locked_state(db,body.revision);before=snapshot(db)
     eligible={r["id"] for r in before["resources"] if r["hotel_id"]=="wyndham" and r["category"]=="premium"}
     if len(body.room_ids) not in [0,4] or len(set(body.room_ids))!=len(body.room_ids) or not set(body.room_ids).issubset(eligible):raise HTTPException(400,"Choose four distinct Premium rooms, or keep the unnamed four-room reserve pool.")
@@ -228,7 +228,7 @@ class LockInput(Revision):
 
 
 @router.put("/locks",dependencies=WRITE)
-def lock(body:LockInput,user:Owner,db:DB):
+def lock(body:LockInput,user:Editor,db:DB):
     state=locked_state(db,body.revision)
     if not db.get(Resource,body.resource_id):raise HTTPException(404,"Room/bed not found")
     key=(body.resource_id,date.fromisoformat(body.night));row=db.get(RoomLock,key)
@@ -247,7 +247,7 @@ class LayoutInput(Revision):positions:list[Position]=Field(max_length=62)
 
 
 @router.put("/layout",dependencies=WRITE)
-def layout(body:LayoutInput,user:Owner,db:DB):
+def layout(body:LayoutInput,user:Editor,db:DB):
     state=locked_state(db,body.revision)
     for position in body.positions:
         resource=db.get(Resource,position.resource_id)
@@ -262,12 +262,12 @@ class RoomInput(Revision):
 
 
 @router.put("/rooms/{resource_id}",dependencies=WRITE)
-def room_settings(resource_id:str,body:RoomInput,user:Owner,db:DB):
+def room_settings(resource_id:str,body:RoomInput,user:Editor,db:DB):
     state=locked_state(db,body.revision);before=snapshot(db)
     resource=db.get(Resource,resource_id)
     if not resource:raise HTTPException(404,"Room/bed not found")
     resource.near_restaurant=body.near_restaurant
-    if resource.room_id:
+    if resource.room_id and "number" in body.model_fields_set:
         room=db.get(Room,resource.room_id)
         if room.hotel_id=="second":
             number=body.number.strip() if body.number else None
@@ -275,6 +275,47 @@ def room_settings(resource_id:str,body:RoomInput,user:Owner,db:DB):
             room.number=number
     db.flush();verify_edit(db,before)
     return record(db,user,state,"room.settings_updated",{"resource_id":resource_id})
+
+
+class RoomNumberInput(Revision):
+    number:str|None=Field(default=None,max_length=16)
+
+
+@router.put("/rooms/{resource_id}/number",dependencies=WRITE)
+def room_number(resource_id:str,body:RoomNumberInput,user:Editor,db:DB):
+    state=locked_state(db,body.revision)
+    resource=db.get(Resource,resource_id)
+    room=db.get(Room,resource.room_id) if resource and resource.room_id else None
+    if not room:raise HTTPException(400,"Only hotel rooms have room numbers.")
+    number=body.number.strip() if body.number else None
+    if room.hotel_id=="wyndham" and not number:raise HTTPException(400,"Enter a Wyndham room number.")
+    if room.number==number:raise HTTPException(400,"This room already has that number.")
+    if number and db.scalar(select(Room.id).where(Room.hotel_id==room.hotel_id,Room.number==number,Room.id!=room.id)):
+        raise HTTPException(409,"That room number is already used at this hotel.")
+    previous=room.number
+    room.number=number
+    return record(db,user,state,"room.number_updated",{"resource_id":resource_id,"from":previous,"to":number})
+
+
+class RoomCategoryInput(Revision):
+    category:Literal["superior","premium"]
+
+
+@router.put("/rooms/{resource_id}/category",dependencies=WRITE)
+def room_category(resource_id:str,body:RoomCategoryInput,user:Editor,db:DB):
+    state=locked_state(db,body.revision);before=snapshot(db)
+    resource=db.get(Resource,resource_id)
+    room=db.get(Room,resource.room_id) if resource and resource.room_id else None
+    if not room or room.hotel_id!="wyndham":raise HTTPException(400,"Only Wyndham guest rooms can be upgraded or downgraded.")
+    if room.category==body.category:raise HTTPException(400,"This room already has that category.")
+    if resource.reserved and body.category!="premium":raise HTTPException(409,"Choose a different Premium family reservation before downgrading this room.")
+    premium_count=sum(r["hotel_id"]=="wyndham" and r["category"]=="premium" for r in before["resources"])
+    if body.category=="superior" and premium_count<=4:raise HTTPException(409,"Keep at least four Premium rooms available for the family reserve.")
+    previous=room.category
+    room.category=body.category
+    room.adult_capacity=4 if body.category=="premium" else 3
+    db.flush();verify_edit(db,before)
+    return record(db,user,state,"room.category_updated",{"resource_id":resource_id,"from":previous,"to":body.category})
 
 
 class LinkInput(Revision):
@@ -285,7 +326,7 @@ class LinkInput(Revision):
 
 
 @router.post("/links",dependencies=WRITE)
-def add_link(body:LinkInput,user:Owner,db:DB):
+def add_link(body:LinkInput,user:Editor,db:DB):
     state=locked_state(db,body.revision);before=snapshot(db)
     a,b=sorted([body.a,body.b],key=str)
     if a==b or not db.get(Guest,a) or not db.get(Guest,b):raise HTTPException(400,"Choose two different existing guests.")
@@ -297,7 +338,7 @@ def add_link(body:LinkInput,user:Owner,db:DB):
 
 
 @router.delete("/links/{link_id}",dependencies=WRITE)
-def delete_link(link_id:uuid.UUID,revision:int,user:Owner,db:DB):
+def delete_link(link_id:uuid.UUID,revision:int,user:Editor,db:DB):
     state=locked_state(db,revision);before=snapshot(db);link=db.get(GuestLink,link_id)
     if not link:raise HTTPException(404,"Relationship not found")
     db.delete(link);db.flush();verify_edit(db,before)
@@ -312,7 +353,7 @@ class ConnectionInput(Revision):
 
 
 @router.post("/connections",dependencies=WRITE)
-def connection(body:ConnectionInput,user:Owner,db:DB):
+def connection(body:ConnectionInput,user:Editor,db:DB):
     state=locked_state(db,body.revision);a,b=sorted([body.a,body.b])
     if a==b or not db.get(Resource,a) or not db.get(Resource,b):raise HTTPException(400,"Choose two different rooms/beds.")
     row=db.get(RoomConnection,(a,b))
@@ -322,7 +363,7 @@ def connection(body:ConnectionInput,user:Owner,db:DB):
 
 
 @router.delete("/connections",dependencies=WRITE)
-def delete_connection(a:str,b:str,revision:int,user:Owner,db:DB):
+def delete_connection(a:str,b:str,revision:int,user:Editor,db:DB):
     state=locked_state(db,revision);before=snapshot(db);row=db.get(RoomConnection,tuple(sorted([a,b])))
     if row:db.delete(row)
     db.flush();verify_edit(db,before)
@@ -341,7 +382,7 @@ class RuleInput(Revision):
 
 
 @router.post("/rules",dependencies=WRITE)
-def add_rule(body:RuleInput,user:Owner,db:DB):
+def add_rule(body:RuleInput,user:Editor,db:DB):
     state=locked_state(db,body.revision);before=snapshot(db)
     if body.kind=="allowed_resources":
         if not body.resource_ids or not set(body.resource_ids).issubset({r["id"] for r in before["resources"]}):raise HTTPException(400,"Select known allowed rooms/beds.")
@@ -359,7 +400,7 @@ def add_rule(body:RuleInput,user:Owner,db:DB):
 
 
 @router.delete("/rules/{rule_id}",dependencies=WRITE)
-def delete_rule(rule_id:uuid.UUID,revision:int,user:Owner,db:DB):
+def delete_rule(rule_id:uuid.UUID,revision:int,user:Editor,db:DB):
     state=locked_state(db,revision);before=snapshot(db);row=db.get(PlanningRule,rule_id)
     if not row:raise HTTPException(404,"Rule not found")
     db.delete(row);db.flush();verify_edit(db,before)
@@ -370,6 +411,26 @@ class Move(Input):
     guest_id:uuid.UUID
     night:Literal["2026-11-24","2026-11-25"]
     resource_id:str|None
+
+
+class SeparateBedInput(Revision):
+    night:Literal["2026-11-24","2026-11-25"]
+    separate_bed:bool
+
+
+@router.put("/assignments/{guest_id}/bed",dependencies=WRITE)
+def separate_bed(guest_id:uuid.UUID,body:SeparateBedInput,user:Editor,db:DB):
+    state=locked_state(db,body.revision)
+    guest=db.get(Guest,guest_id)
+    row=db.get(Assignment,(guest_id,date.fromisoformat(body.night)))
+    if not guest or not row:raise HTTPException(404,"Assign this child to a hotel room on this night first.")
+    resource=db.get(Resource,row.resource_id)
+    if guest.category!="guest" or (guest.age is not None and guest.age>10) or (guest.age is None and guest.age_band!="child") or not resource.room_id:
+        raise HTTPException(400,"Separate-bed counting is available only for a hotel guest aged 10 or under.")
+    if row.separate_bed==body.separate_bed:raise HTTPException(400,"This bed choice is already saved.")
+    row.separate_bed=body.separate_bed
+    state.cursor=None;state.redo=[]
+    return record(db,user,state,"assignment.separate_bed_updated",{"guest_id":str(guest_id),"night":body.night,"separate_bed":body.separate_bed})
 
 
 class Moves(Revision):
@@ -383,7 +444,7 @@ class Destinations(Revision):
 
 
 @router.post("/assignments/destinations",dependencies=WRITE)
-def destinations(body:Destinations,user:Owner,db:DB):
+def destinations(body:Destinations,user:Editor,db:DB):
     locked_state(db,body.revision);data=snapshot(db);ids={str(g) for g in body.guest_ids}
     if not ids.issubset({g['id'] for g in data['guests']}):raise HTTPException(404,"Guest no longer exists")
     base=[a for a in data['assignments'] if not (a['guest_id'] in ids and a['night']==body.night)]
@@ -432,14 +493,16 @@ def summaries_for(db,rows):
 
 
 @router.post("/assignments/preview",dependencies=WRITE)
-def preview_moves(body:Moves,user:Owner,db:DB):
+def preview_moves(body:Moves,user:Editor,db:DB):
     locked_state(db,body.revision);current={(a["guest_id"],a["night"]):a for a in assignments(db)};seen=set()
     for move in body.moves:
         key=(str(move.guest_id),move.night)
         if key in seen:raise HTTPException(400,"Duplicate guest/night in the same move")
         seen.add(key)
         if not db.get(Guest,move.guest_id):raise HTTPException(404,"Guest no longer exists")
-        if move.resource_id:current[key]={"guest_id":key[0],"night":key[1],"resource_id":move.resource_id}
+        if move.resource_id:
+            if key not in current or current[key]["resource_id"]!=move.resource_id:
+                current[key]={"guest_id":key[0],"night":key[1],"resource_id":move.resource_id}
         else:current.pop(key,None)
     after=sorted(current.values(),key=lambda a:(a["night"],a["guest_id"]))
     data=snapshot(db)
@@ -453,7 +516,7 @@ def preview_moves(body:Moves,user:Owner,db:DB):
 
 
 @router.post("/assignments/apply",dependencies=WRITE)
-def apply_assignment(body:ApplyInput,user:Owner,db:DB):
+def apply_assignment(body:ApplyInput,user:Editor,db:DB):
     state=locked_state(db,body.revision);pending=db.get(PendingChange,body.token)
     if not pending or pending.kind!="assignment" or pending.owner_id!=user.id or pending.expires_at<=now():raise HTTPException(409,"This preview expired or was already applied. Preview the move again.")
     if pending.revision!=state.revision:raise HTTPException(409,"The plan changed after preview. Preview again.")
@@ -492,7 +555,7 @@ class HistoryInput(Revision):direction:Literal["undo","redo"]
 
 
 @router.post("/history",dependencies=WRITE)
-def history(body:HistoryInput,user:Owner,db:DB):
+def history(body:HistoryInput,user:Editor,db:DB):
     state=locked_state(db,body.revision);data=snapshot(db)
     if body.direction=="undo":
         change=db.get(PlanChange,state.cursor) if state.cursor else None
@@ -518,12 +581,12 @@ def history(body:HistoryInput,user:Owner,db:DB):
 
 
 @router.get("/history")
-def list_history(user:Owner,db:DB):
+def list_history(user:Editor,db:DB):
     return {"items":[{"id":str(a.id),"action":a.action,"created_at":a.created_at.isoformat(),"revision":a.entity_id} for a in db.scalars(select(Audit).where(~Audit.action.like('session.%')).order_by(Audit.created_at.desc()).limit(100))]}
 
 
 @router.post("/allocation",dependencies=WRITE,status_code=202)
-def queue_allocation(body:Revision,user:Owner,db:DB):
+def queue_allocation(body:Revision,user:Editor,db:DB):
     state=locked_state(db,body.revision)
     if db.scalar(select(AllocationRun.id).where(AllocationRun.status.in_(["queued","running"]))):raise HTTPException(409,"An allocation job is already running.")
     data=snapshot(db)
@@ -539,13 +602,13 @@ def run_view(run,state):
 
 
 @router.get("/allocation")
-def list_runs(user:Owner,db:DB):
+def list_runs(user:Editor,db:DB):
     state=db.get(PlanState,1)
     return {"runs":[run_view(r,state) for r in db.scalars(select(AllocationRun).order_by(AllocationRun.created_at.desc()).limit(10))]}
 
 
 @router.post("/allocation/{run_id}/preview",dependencies=WRITE)
-def allocation_preview(run_id:uuid.UUID,body:Revision,user:Owner,db:DB):
+def allocation_preview(run_id:uuid.UUID,body:Revision,user:Editor,db:DB):
     locked_state(db,body.revision);run=db.get(AllocationRun,run_id)
     if not run or run.status!="completed" or run.revision!=body.revision or not run.result or run.result.get("assignments") is None:raise HTTPException(409,"This proposal is unavailable or stale. Run allocation again.")
     result=preview_plan(db,user,body.revision,run.result["assignments"])
@@ -574,13 +637,13 @@ def meal_rows(db,ids=None):
 @router.get("/meals")
 def meals(user:Viewer,db:DB):
     data=visible_plan(db,user);rows=meal_rows(db,{g["id"] for g in data["guests"]})
-    if user.role!="owner":
+    if user.role not in {"owner","editor"}:
         for row in rows:row.pop("inclusion")
     return {"revision":data["revision"],"rows":rows}
 
 
 @router.put("/meals",dependencies=WRITE)
-def save_meals(body:Meals,user:Owner,db:DB):
+def save_meals(body:Meals,user:Editor,db:DB):
     state=locked_state(db,body.revision);seen=set()
     for item in body.rows:
         key=(item.guest_id,date.fromisoformat(item.day),item.meal,item.location)
@@ -606,7 +669,7 @@ class PresenceInput(Revision):
 
 
 @router.put('/presence/{guest_id}',dependencies=WRITE)
-def presence(guest_id:uuid.UUID,body:PresenceInput,user:Owner,db:DB):
+def presence(guest_id:uuid.UUID,body:PresenceInput,user:Editor,db:DB):
     state=locked_state(db,body.revision)
     if not db.get(Guest,guest_id):raise HTTPException(404,'Guest not found')
     if body.arrived_at and body.departed_at and body.departed_at<body.arrived_at:raise HTTPException(400,'Departure cannot precede actual arrival')
@@ -632,7 +695,7 @@ class EventInput(Revision):
 
 
 @router.post('/events',dependencies=WRITE,status_code=201)
-def add_event(body:EventInput,user:Owner,db:DB):
+def add_event(body:EventInput,user:Editor,db:DB):
     state=locked_state(db,body.revision)
     if not body.name.strip():raise HTTPException(400,'Enter a function/event name')
     if db.scalar(select(FunctionEvent.id).where(FunctionEvent.name==body.name.strip(),FunctionEvent.day==date.fromisoformat(body.day),FunctionEvent.side==body.side)):raise HTTPException(409,'This function already exists for that date and side.')
@@ -663,7 +726,7 @@ class EventRows(Revision):rows:list[EventRow]=Field(max_length=1000)
 
 
 @router.put('/functions/attendance',dependencies=WRITE)
-def event_attendance(body:EventRows,user:Owner,db:DB):
+def event_attendance(body:EventRows,user:Editor,db:DB):
     state=locked_state(db,body.revision);seen=set()
     for item in body.rows:
         key=(item.event_id,item.guest_id)
@@ -688,7 +751,7 @@ def billing_data(db,basis="planned",rows=None):
 
 
 @router.get("/billing")
-def billing(user:Owner,db:DB,basis:Literal["planned","actual"]="planned"):return billing_data(db,basis)
+def billing(user:Editor,db:DB,basis:Literal["planned","actual"]="planned"):return billing_data(db,basis)
 
 
 class Rates(Revision):
@@ -710,7 +773,7 @@ class Rates(Revision):
 
 
 @router.put("/billing/rates",dependencies=WRITE)
-def rates(body:Rates,user:Owner,db:DB):
+def rates(body:Rates,user:Editor,db:DB):
     state=locked_state(db,body.revision);policy=db.get(EventPolicy,1);settings=db.get(BillingSettings,1)
     before=billing_data(db)["policy"]
     for key in before:setattr(policy,key,getattr(body,key))
@@ -723,7 +786,7 @@ class SnapshotInput(Revision):basis:Literal["planned","actual"]="planned"
 
 
 @router.post("/billing/snapshots",dependencies=WRITE)
-def bill_snapshot(body:SnapshotInput,user:Owner,db:DB):
+def bill_snapshot(body:SnapshotInput,user:Editor,db:DB):
     locked_state(db,body.revision);data=billing_data(db,body.basis)
     saved=BillSnapshot(actor_id=user.id,revision=body.revision,data=data);db.add(saved)
     db.add(Audit(actor_id=user.id,action="estimate.saved",entity_id=str(body.revision),details={"basis":body.basis}));db.commit()
@@ -731,7 +794,7 @@ def bill_snapshot(body:SnapshotInput,user:Owner,db:DB):
 
 
 @router.get("/billing/snapshots")
-def bill_snapshots(user:Owner,db:DB):return {"snapshots":[{"id":str(s.id),"revision":s.revision,"created_at":s.created_at.isoformat(),"data":s.data} for s in db.scalars(select(BillSnapshot).order_by(BillSnapshot.created_at.desc()).limit(20))]}
+def bill_snapshots(user:Editor,db:DB):return {"snapshots":[{"id":str(s.id),"revision":s.revision,"created_at":s.created_at.isoformat(),"data":s.data} for s in db.scalars(select(BillSnapshot).order_by(BillSnapshot.created_at.desc()).limit(20))]}
 
 
 @router.get("/events")
@@ -792,7 +855,7 @@ def wedding_details(user:Viewer,db:DB):
 
 
 @router.put('/wedding-details',dependencies=WRITE)
-def save_wedding_details(body:WeddingInput,user:Owner,db:DB):
+def save_wedding_details(body:WeddingInput,user:Editor,db:DB):
     state=locked_state(db,body.revision);row=db.get(WeddingDetails,1)
     if not row:row=WeddingDetails(id=1);db.add(row)
     row.data=body.model_dump(exclude={'revision'})

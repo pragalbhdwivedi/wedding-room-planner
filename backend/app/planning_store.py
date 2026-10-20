@@ -15,7 +15,7 @@ def locked_state(db, expected):
 
 
 def assignments(db):
-    return sorted([{"guest_id":str(a.guest_id),"night":a.night.isoformat(),"resource_id":a.resource_id} for a in db.scalars(select(Assignment))],key=lambda a:(a['night'],a['guest_id']))
+    return sorted([{"guest_id":str(a.guest_id),"night":a.night.isoformat(),"resource_id":a.resource_id,**({"separate_bed":True} if a.separate_bed else {})} for a in db.scalars(select(Assignment))],key=lambda a:(a['night'],a['guest_id']))
 
 
 def snapshot(db):
@@ -52,7 +52,7 @@ def visible_plan(db,user):
             s["free_rooms"]=None
             for property in s["properties"].values():property["empty"]=None
             s["side_rooms"]={user.side:s["side_rooms"][user.side]}
-    if user.role!="owner":
+    if user.role not in {"owner","editor"}:
         for g in data["guests"]:
             g.pop("notes",None)
             if user.role=="family":g.pop("phone",None)
@@ -67,7 +67,7 @@ def visible_plan(db,user):
 
 def save_assignments(db,rows):
     db.execute(delete(Assignment))
-    db.add_all([Assignment(guest_id=uuid.UUID(a["guest_id"]),night=date.fromisoformat(a["night"]),resource_id=a["resource_id"]) for a in rows])
+    db.add_all([Assignment(guest_id=uuid.UUID(a["guest_id"]),night=date.fromisoformat(a["night"]),resource_id=a["resource_id"],separate_bed=a.get("separate_bed",False)) for a in rows])
     db.flush()
 
 
