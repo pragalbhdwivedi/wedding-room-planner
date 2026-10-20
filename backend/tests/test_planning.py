@@ -493,6 +493,7 @@ def test_room_downgrade_keeps_four_premium_reserve_and_named_reservation(client,
     assert sum(r['category']=='premium' and r['hotel_id']=='wyndham' for r in data['resources'])==23
     assert next(r for r in data['resources'] if r['id']=='w-103')['adult_capacity']==3
     premium=[r for r in data['resources'] if r['hotel_id']=='wyndham' and r['category']=='premium']
+    data['resources']=premium
     data['families']=[];data['guests']=[]
     for i in range(20):
         fid=f'synthetic-family-{i}';gid=f'synthetic-person-{i}'
@@ -503,6 +504,7 @@ def test_room_downgrade_keeps_four_premium_reserve_and_named_reservation(client,
     proposal=allocate(data)
     premium_ids={r['id'] for r in premium}
     assert proposal['assignments'] is not None and len({a['resource_id'] for a in proposal['assignments'] if a['resource_id'] in premium_ids})<=19
+    assert len(proposal['unassigned'])==2
     reserve(client,owner,['w-101','w-201','w-203','w-105'])
     rejected=client.put('/api/planning/rooms/w-101/category',json={'revision':revision(client),'category':'superior'},headers=headers(owner))
     assert rejected.status_code==409 and 'family reservation' in rejected.text
