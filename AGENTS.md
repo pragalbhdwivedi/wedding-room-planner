@@ -22,7 +22,7 @@
 - Separate actual people, hotel-counted guests, bedding needs, and physical occupancy. A child aged 10 or under counts toward hotel headcount only when an editor explicitly assigns a separate bed for that night. Do not invent a child physical-capacity ceiling.
 - Block overlapping assignments for one guest. Sharing a room is normal and must not be prohibited by a room-level one-guest constraint.
 - Preserve locks and reserved inventory during solver runs. Apply proposals transactionally only after revalidating their input revision.
-- Warning overrides require explicit confirmation by the acting owner/editor and an audit record. Mandatory guest/staff separation is not overridable.
+- For a manual room or bed move, show planning conflicts as advisory warnings and let an authorised owner/editor apply the move without extra acknowledgements. Audit the exact issue IDs. The solver remains rule-aware. Enforce authentication, known guest/resource/night, unique guest-night occupancy, revision checks and fixed hotel inventory.
 - Database changes require migrations. Monetary calculations must use precise integer paise or an equivalent exact representation.
 - Update affected requirements, decisions, open items, acceptance checks, and status with code changes.
 - Report tests against the exact commit and environment. A successful image build is not functional acceptance or deployment.

@@ -40,7 +40,7 @@ def matches(guest, rule):
 
 
 def issue(code, message, *, severity="hard", guests=(), resources=(), night=None):
-    # IDs bind acknowledgement to a concrete warning, not a generic override.
+    # IDs identify a concrete issue for preview revalidation and audit.
     key = ":".join([code, str(night or ""), ",".join(sorted(guests)), ",".join(sorted(resources))])
     return {"id": key, "code": code, "message": message, "severity": severity,
             "guest_ids": sorted(guests), "resource_ids": sorted(resources), "night": night}
@@ -50,7 +50,7 @@ def resource_issues(guest, resource, snapshot):
     result = []
     def fail(code, message):result.append(issue(code, message, guests=[guest["id"]], resources=[resource["id"]]))
     if (guest["category"] in STAFF) != (resource["hotel_id"] == "staff"):
-        fail("staff_separation", "Guests use hotel rooms; drivers, staff and vendors use dormitory beds only.")
+        fail("staff_separation", "This placement mixes guest accommodation and staff/dormitory use.")
     if age_band(guest)=="unknown":
         fail("age_unknown", "Enter the guest's age before assignment; unknown age is unresolved.")
     elif guest["age"] is None:
@@ -128,11 +128,11 @@ def validate(snapshot, assignments, *, before=None):
         r=resources[rid];gids=[g["id"] for g in people]
         if not capacity_ok(people,r):result.append(issue("capacity", "Adult capacity or the confirmed child-sharing arrangement is exceeded/unresolved.", guests=gids, resources=[rid],night=night))
         for a,b in combinations(people,2):
-            if not compatible(a,b,links):result.append(issue("compatibility", "Friends share only with the same specified gender and side. Other unrelated guests need explicit sharing compatibility; mandatory exclusions remain enforced.", guests=[a["id"],b["id"]], resources=[rid],night=night))
+            if not compatible(a,b,links):result.append(issue("compatibility", "This placement conflicts with saved sharing preferences or exclusions.", guests=[a["id"],b["id"]], resources=[rid],night=night))
     if snapshot["reserved_count"]==0:
         premium={a['resource_id'] for a in assignments if a['resource_id'] in resources and resources[a['resource_id']]['hotel_id']=='wyndham' and resources[a['resource_id']]['category']=='premium'}
         premium_count=sum(r['hotel_id']=='wyndham' and r['category']=='premium' for r in resources.values())
-        if len(premium)>premium_count-4:result.append(issue('reserve_pool','Four Premium rooms must stay unused across both nights until named family rooms are chosen.',resources=premium))
+        if len(premium)>premium_count-4:result.append(issue('reserve_pool','Fewer than four Premium rooms remain unused across both nights.',resources=premium))
     rosters=friend_rosters(snapshot)
     for night in NIGHTS:
         for family in snapshot["families"]:
@@ -166,7 +166,7 @@ def validate(snapshot, assignments, *, before=None):
         def occupants(values,rid,night):return {a["guest_id"] for a in values if a["resource_id"]==rid and a["night"]==night}
         for lock in snapshot.get("locks",[]):
             rid,night=lock["resource_id"],lock["night"]
-            if occupants(before,rid,night)!=occupants(assignments,rid,night):result.append(issue("locked", "Unlock this room/bed before changing its occupants.",resources=[rid],night=night))
+            if occupants(before,rid,night)!=occupants(assignments,rid,night):result.append(issue("locked", "This move changes a locked room or bed.",resources=[rid],night=night))
     unique={i["id"]:i for i in result}
     return {"errors":[i for i in unique.values() if i["severity"]=="hard"],"warnings":[i for i in unique.values() if i["severity"]=="warning"],"notices":[i for i in unique.values() if i["severity"]=="notice"]}
 
