@@ -21,6 +21,7 @@ Build a private web-based room-allocation application inside Docker. Support pho
 
 - Age 10 and below is treated as a child; above age 10 counts as an adult. A child aged 10 or under counts toward hotel guest totals and the chargeable accommodation headcount only when an owner/editor explicitly assigns a separate bed for that child and night. A child sharing without a separate bed remains visible in the physical people/placement count. This supersedes the earlier age-12 suggestion.
 - Couples with children receive Superior rooms with extra bedding rather than Premium rooms.
+- In family/group entry and edit, let an editor tick Superior or Premium as the required room type, or leave both unticked. The choice applies to all members and both nights at Wyndham, guides automatic allocation, and blocks a manual placement in another room type until edited. A couple-with-children group cannot require Premium. This selection does not change a room's own category or imply hotel approval.
 - The owner explicitly allowed two adults and two children aged 10 or below in a Superior room. Keep actual headcount separate from adult-counted occupancy.
 - The maximum permitted number of young children physically occupying a room has not been supplied. Do not generalise the example into unlimited physical occupancy.
 - Support named individuals, family headcounts, and later completion of names and ages. Do not double-count a family when its named members are entered.

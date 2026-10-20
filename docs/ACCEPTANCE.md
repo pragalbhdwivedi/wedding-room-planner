@@ -55,6 +55,7 @@ Status: acceptance plan; actual results are recorded separately in STATUS.md. Us
 | A43 | Change room number | Owner can rename a Wyndham or second-hotel room from either room view; assignments and stable room ID remain intact. A duplicate number within the hotel is refused without a revision change; family/reception viewers cannot rename rooms. |
 | A44 | Explicit child bed and guest count | A child aged 10 or under sharing a room without a separate bed remains in people/placement totals but not hotel counted guests, allowance or excess. Tick a separate bed for one night and only that night gains one counted guest and bedding need; untick reverses it. A room move clears the old bed choice. Adult and viewer bed edits are refused. |
 | A45 | Full editor access | A privately promoted editor signs in again after session revocation, sees both sides and billing, can create/edit users and guests, move people and edit rates. Owner remains the sole protected owner; family/reception viewers retain their existing scopes and cannot mutate or see restricted costs. |
+| A46 | Family room-type tick | An editor can tick Superior or Premium in add/edit family, untick to clear, and see the saved choice. Manual moves to another category fail clearly; automatic allocation proposes only the selected Wyndham category. Editing a placed family's choice reviews a valid move before saving. Premium plus couple-with-children is rejected. Excel round-trip retains the choice, while older templates do not clear it. |
 
 ## Owner acceptance
 

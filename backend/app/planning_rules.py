@@ -65,6 +65,9 @@ def resource_issues(guest, resource, snapshot):
         fail("accommodation_choice", "This guest is marked for Wyndham.")
     if resource["reserved"] and not guest["reserved_eligible"]:
         fail("reserved_family", "This room is reserved for eligible family guests.")
+    required_type=guest.get("required_room_type")
+    if required_type and (resource["hotel_id"]!="wyndham" or resource["category"]!=required_type):
+        fail("family_room_type", f"This family is set to {required_type.title()} at Wyndham. Change the family room type before assigning another kind of room.")
     if resource["hotel_id"] == "wyndham" and resource["category"] == "premium":
         if guest["couple_children"]:
             fail("couple_children", "A couple with children uses a Superior room with extra bedding at Wyndham.")

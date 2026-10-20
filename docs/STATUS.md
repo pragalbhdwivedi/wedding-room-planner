@@ -7,6 +7,7 @@ Updated 20 October 2026, Asia/Kolkata. Implementation, automated verification, d
 | Dedicated Docker host | Prepared and checked | Dedicated Debian VM, private persistent PostgreSQL, web-only upstream behind the owner's HTTPS reverse proxy |
 | Owner, editor and viewer administration | Implemented; private account promotion completed | Sole protected owner preserved; two specified existing accounts granted full editor access with prior sessions revoked; family/reception remain viewers |
 | Guest/family entry | Implemented | Stable unnamed slots and adult/child bands, pending exact-age flags, private contacts/notes and resident selection |
+| Family room-type choice | Implemented in source; release verification pending | Family form can require Superior or Premium at Wyndham; shared validation gates manual moves and automatic allocation, with reviewed repairs for occupied families |
 | Reservations and topology | Implemented | All-room initial grid, optional four-room Premium reserve pool or four named reservations, editable schematic layout and confirmed corridor/restaurant flags |
 | Manual assignments | Implemented | Individual/family drag/drop and tap, tick any subset from a target room, named pairwise sharing confirmation in the placement review, locks, atomic swaps, assignment undo/redo |
 | Automatic allocation | Implemented | Leased worker jobs, bounded CP-SAT proposals, whole-family units, honest unresolved diagnostics, owner-reviewed transactional apply |

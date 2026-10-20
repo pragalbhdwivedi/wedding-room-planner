@@ -9,7 +9,7 @@ from .planning_rules import NIGHTS,active,capacity_ok,compatible,resource_issues
 def project_edit(before,fid,body):
     data=copy.deepcopy(before)
     family=next(f for f in data['families'] if f['id']==fid)
-    family.update({k:body[k] for k in ['label','side','reserved_eligible','couple_children']})
+    family.update({k:body[k] for k in ['label','side','reserved_eligible','couple_children','required_room_type']})
     existing={g['id'] for g in before['guests'] if g['family_id']==fid}
     supplied=[str(m['id']) for m in body['members'] if m.get('id')]
     if len(supplied)!=len(set(supplied)) or not set(supplied).issubset(existing):
@@ -17,7 +17,7 @@ def project_edit(before,fid,body):
     removed=sorted(existing-set(supplied))
     people=[]
     for member in body['members']:
-        g={**member,'id':str(member.get('id') or uuid.uuid4()),'family_id':fid,'side':family['side'],'group_label':family['label'],'reserved_eligible':family['reserved_eligible'],'couple_children':family['couple_children']}
+        g={**member,'id':str(member.get('id') or uuid.uuid4()),'family_id':fid,'side':family['side'],'group_label':family['label'],'reserved_eligible':family['reserved_eligible'],'couple_children':family['couple_children'],'required_room_type':family['required_room_type']}
         people.append(g)
     data['guests']=[g for g in data['guests'] if g['family_id']!=fid]+people
     data['links']=[link for link in data['links'] if link['a'] not in removed and link['b'] not in removed]

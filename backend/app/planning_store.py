@@ -19,12 +19,12 @@ def assignments(db):
 
 
 def snapshot(db):
-    families=[{"id":str(f.id),"label":f.label,"side":f.side,"reserved_eligible":f.reserved_eligible,"couple_children":f.couple_children} for f in db.scalars(select(Family).order_by(Family.label,Family.id))]
+    families=[{"id":str(f.id),"label":f.label,"side":f.side,"reserved_eligible":f.reserved_eligible,"couple_children":f.couple_children,"required_room_type":f.required_room_type} for f in db.scalars(select(Family).order_by(Family.label,Family.id))]
     family_map={f["id"]:f for f in families}
     guests=[]
     for g in db.scalars(select(Guest).order_by(Guest.family_id,Guest.id)):
         f=family_map[str(g.family_id)]
-        guests.append({"id":str(g.id),"family_id":str(g.family_id),"name":g.name,"age":g.age,"age_band":g.age_band,"gender":g.gender,"sharing_mode":g.sharing_mode,"group_label":f["label"],"category":g.category,"phone":g.phone,"arrival":g.arrival.isoformat() if g.arrival else None,"tags":g.tags,"notes":g.notes,"side":f["side"],"reserved_eligible":f["reserved_eligible"],"couple_children":f["couple_children"]})
+        guests.append({"id":str(g.id),"family_id":str(g.family_id),"name":g.name,"age":g.age,"age_band":g.age_band,"gender":g.gender,"sharing_mode":g.sharing_mode,"group_label":f["label"],"category":g.category,"phone":g.phone,"arrival":g.arrival.isoformat() if g.arrival else None,"tags":g.tags,"notes":g.notes,"side":f["side"],"reserved_eligible":f["reserved_eligible"],"couple_children":f["couple_children"],"required_room_type":f["required_room_type"]})
     rooms={r.id:r for r in db.scalars(select(Room))}
     resources=[]
     for r in db.scalars(select(Resource).order_by(Resource.id)):

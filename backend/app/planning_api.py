@@ -75,6 +75,7 @@ class FamilyInput(Revision):
     side:Literal["bride","groom"]
     reserved_eligible:bool=False
     couple_children:bool=False
+    required_room_type:Literal["superior","premium"]|None=None
     members:list[GuestInput]=Field(min_length=1,max_length=80)
 
     @field_validator("label")
@@ -82,6 +83,14 @@ class FamilyInput(Revision):
     def label_text(cls,value):
         if not value.strip():raise ValueError("Enter a family/group name")
         return value.strip()
+
+    @model_validator(mode="after")
+    def compatible_room_type(self):
+        if self.couple_children and self.required_room_type=="premium":
+            raise ValueError("Couples with children must use Superior rooms at Wyndham")
+        if self.required_room_type and any(m.category!="guest" for m in self.members):
+            raise ValueError("Superior/Premium room types apply to hotel guests, not staff or drivers")
+        return self
 
 
 def record(db,user,state,action,details=None):
@@ -107,7 +116,7 @@ def get_plan(user:Viewer,db:DB):return visible_plan(db,user)
 def create_family(body:FamilyInput,user:Editor,db:DB):
     state=locked_state(db,body.revision)
     if len(snapshot(db)["guests"])+len(body.members)>1000:raise HTTPException(400,"The current event supports up to 1,000 guest slots.")
-    family=Family(label=body.label,side=body.side,reserved_eligible=body.reserved_eligible,couple_children=body.couple_children)
+    family=Family(label=body.label,side=body.side,reserved_eligible=body.reserved_eligible,couple_children=body.couple_children,required_room_type=body.required_room_type)
     db.add(family);db.flush()
     _members(db,family,body.members,creating=True)
     return {**record(db,user,state,"family.created",{"family_id":str(family.id),"slots":len(body.members)}),"family_id":str(family.id)}
@@ -168,7 +177,7 @@ def update_family(family_id:uuid.UUID,body:FamilyInput,user:Editor,db:DB):
 
 def persist_family_edit(db,payload):
     f=payload['family'];family=db.get(Family,uuid.UUID(f['id']))
-    for key in ['label','side','reserved_eligible','couple_children']:setattr(family,key,f[key])
+    for key in ['label','side','reserved_eligible','couple_children','required_room_type']:setattr(family,key,f[key])
     for guest_id in payload.get('removed_guest_ids',[]):
         gid=uuid.UUID(guest_id)
         db.execute(delete(Assignment).where(Assignment.guest_id==gid))
