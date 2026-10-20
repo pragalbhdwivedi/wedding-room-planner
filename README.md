@@ -4,7 +4,7 @@ Canonical source of truth for the wedding accommodation planner: requirements, d
 
 Canonical repository: [pragalbhdwivedi/wedding-room-planner](https://github.com/pragalbhdwivedi/wedding-room-planner), branch `main`.
 
-**Implemented: private guest/family entry, family reservations, editable room topology, drag/drop and tap assignment, locks/swaps/history, automatic allocation proposals, arrivals/functions/meals, billing estimates, scoped Excel import/export, live views, and a private invitation family directory with timed functions.** Verification and deployment evidence are recorded in [status](docs/STATUS.md).
+**Implemented: private guest/family entry, family reservations, editable room topology, drag/drop and tap assignment, locks/swaps/history, automatic allocation proposals, arrivals/functions/meals, billing estimates, scoped Excel import/export, live views, an AADI-inspired light/dark interface, and a private invitation family directory with timed functions.** Verification and deployment evidence are recorded in [status](docs/STATUS.md).
 
 The owner requested this public repository on 19 October 2026 (Asia/Kolkata) to prevent future ambiguity. The repository records the room-planning application separately from the existing invitation website.
 
