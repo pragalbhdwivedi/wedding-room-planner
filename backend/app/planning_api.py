@@ -546,6 +546,8 @@ def apply_assignment(body:ApplyInput,user:Editor,db:DB):
     data=snapshot(db);before=data["assignments"];after=pending.payload["after"]
     pairs=[tuple(pair) for pair in pending.payload.get("sharing_pairs",[])]
     manual_override=bool(pending.payload.get("manual_override"))
+    if not manual_override and not pending.payload.get('allocation_run') and not pending.payload.get('history_direction'):
+        raise HTTPException(409,"This older room preview has expired. Refresh the page and preview the arrangement again.")
     if pairs and pairs!=sharing_candidates(data,after,{g for pair in pairs for g in pair}):raise HTTPException(409,"Sharing consent changed. Preview the move again.")
     if manual_override:
         expected={w['id'] for w in advisory_issues(data,after,before)}
