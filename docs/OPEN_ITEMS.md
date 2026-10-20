@@ -20,7 +20,7 @@ These remain open as of the 19 October 2026 baseline. Do not invent answers. Mos
 | O14 | Backup destination, retention, recovery targets, data retention after event | Owner explicitly deferred backup work under D26. No scheduled backup or recovery verification is claimed. |
 | O15 | Guest names, ages, contacts, headcounts and relationship tags | Enter privately later. Never request or publish these in public issues. |
 | O16 | Public software licence | None selected. Do not add an open-source licence automatically. |
-| O17 | Hotel confirmation and pricing for room-type changes | The owner can plan a Superior/Premium switch, but no hotel approval workflow or category-based price difference has been supplied. Do not label the hotel booking confirmed or change the bill automatically. |
+| O17 | Hotel confirmation and pricing for stay moves | The owner can move guests between fixed Superior/Premium room numbers in the plan, but no hotel approval workflow or category-based price difference has been supplied. Do not label the hotel booking confirmed or change the bill automatically. |
 | O17 | Resolved pool behaviour; physical selection remains open | D35 authorises four unused Premium rooms across both nights. Exact family room numbers still await owner choice. |
 | O18 | Guest gender and friend classification | Owner enters these individually. Never infer gender from names; unspecified Friends are not automatically paired. |
 

@@ -153,15 +153,15 @@ function App() {
     }
     return body;
   }
-  async function updateSelectedRoom(kind: "category" | "number", value: string | null) {
+  async function updateSelectedRoomNumber(value: string | null) {
     if (!selected || !owner) return;
     setBusy(true);
     setError("");
     try {
       const current = await api("/planning");
-      await api("/planning/rooms/" + selected.id + "/" + kind, {
+      await api("/planning/rooms/" + selected.id + "/number", {
         method: "PUT",
-        body: JSON.stringify({ revision: current.revision, [kind]: value }),
+        body: JSON.stringify({ revision: current.revision, number: value }),
       });
       const next = await api("/inventory");
       setInventory(next);
@@ -1068,31 +1068,28 @@ function App() {
                   <p className="subtle">
                     Young-child sharing is a separate policy. This capacity does
                     not establish a total physical headcount limit. Guest
-                    allocation is not available in this stage.
+                    placement is managed in the room planner.
                   </p>
-                  {owner && selected.hotel_id === "wyndham" && (
-                    <>
-                      <p className="subtle">
-                        A room-type change applies to both nights. It will be
-                        refused if a placement or the four-room Premium reserve
-                        would become invalid. Confirm the actual change with the hotel separately.
-                      </p>
-                      <button
-                        className="secondary compact"
-                        disabled={busy}
-                        onClick={() => updateSelectedRoom("category", selected.category === "superior" ? "premium" : "superior")}
-                      >
-                        {selected.category === "superior" ? "Upgrade to Premium" : "Downgrade to Superior"}
-                      </button>
-                    </>
+                  {selected.hotel_id === "wyndham" && (
+                    <p className="subtle">
+                      This room number and type are fixed by the hotel layout.
+                      To upgrade or downgrade a stay, move its guests to a
+                      different numbered room in the room planner.
+                    </p>
                   )}
-                  {owner && (
+                  {owner && selected.hotel_id === "wyndham" && (
+                    <button className="secondary compact" onClick={() => {
+                      setSelected(null);
+                      setPage("planner");
+                    }}>Open room planner</button>
+                  )}
+                  {owner && selected.hotel_id === "second" && (
                     <form
                       className="room-number-action"
                       onSubmit={(e) => {
                         e.preventDefault();
                         const form = new FormData(e.currentTarget);
-                        updateSelectedRoom("number", String(form.get("room-number") || "").trim() || null);
+                        updateSelectedRoomNumber(String(form.get("room-number") || "").trim() || null);
                       }}
                     >
                       <label>
@@ -1101,7 +1098,6 @@ function App() {
                           key={selected.id + ":" + (selected.number || "")}
                           name="room-number"
                           maxLength={16}
-                          required={selected.hotel_id === "wyndham"}
                           defaultValue={selected.number || ""}
                         />
                       </label>

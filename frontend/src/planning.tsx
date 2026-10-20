@@ -417,6 +417,9 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
     [layoutMode, setLayoutMode] = useState(false),
     [swapFrom, setSwapFrom] = useState<Resource | null>(null);
   const [details, setDetails] = useState<Resource | null>(null),
+    [relocation, setRelocation] = useState<Resource | null>(null),
+    [relocationTarget, setRelocationTarget] = useState(""),
+    [relocationBothNights, setRelocationBothNights] = useState(false),
     [pickerRoom, setPickerRoom] = useState<Resource | null>(null),
     [pickerSelection, setPickerSelection] = useState<string[]>([]),
     [pickerSearch, setPickerSearch] = useState(""),
@@ -974,6 +977,14 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
       <div className="planning-loading">{error || "Opening your plan…"}</div>
     );
   const summary = data.summary[night];
+  const relocationType = relocation?.category === "superior" ? "premium" : "superior";
+  const relocationNights = relocationBothNights ? nights : [night];
+  const relocationAssignments = relocation
+    ? data.assignments.filter((a) => a.resource_id === relocation.id && relocationNights.includes(a.night))
+    : [];
+  const relocationRooms = data.resources
+    .filter((r) => r.hotel_id === "wyndham" && r.category === relocationType)
+    .sort((a, b) => Number(a.number) - Number(b.number));
   const currentJob = jobs[0];
   const reservePending = owner && data.reserved_count !== 4;
   const sourcePending = data.guests.some((g) =>
@@ -3233,29 +3244,25 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
               {details.hotel_id === "wyndham" && (
                 <div className="room-category-action">
                   <p className="form-help">
-                    Changing room type updates the adult capacity for both nights.
-                    Existing placements and the four-room Premium reserve must remain valid.
-                    Confirm any actual room change with the hotel separately.
+                    Room {details.number} stays {details.category}. Move its
+                    occupants to an actual numbered room for an upgrade or downgrade.
                   </p>
                   <button
                     type="button"
                     className="secondary compact"
-                    disabled={busy}
-                    onClick={async () => {
-                      const target = details.category === "superior" ? "premium" : "superior";
-                      const result = await action(
-                        "/rooms/" + details.id + "/category",
-                        { revision: data.revision, category: target },
-                        "PUT",
-                      );
-                      if (result) setDetails(null);
+                    disabled={busy || !data.assignments.some((a) => a.resource_id === details.id)}
+                    onClick={() => {
+                      setRelocation(details);
+                      setRelocationTarget("");
+                      setRelocationBothNights(false);
+                      setDetails(null);
                     }}
                   >
-                    {details.category === "superior" ? "Upgrade to Premium" : "Downgrade to Superior"}
+                    {details.category === "superior" ? "Move stay to a Premium room" : "Move stay to a Superior room"}
                   </button>
                 </div>
               )}
-              {details.hotel_id !== "staff" && (
+              {details.hotel_id === "second" && (
                 <form
                   className="room-number-action"
                   onSubmit={async (e) => {
@@ -3274,7 +3281,6 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                     <input
                       name="room-number"
                       maxLength={16}
-                      required={details.hotel_id === "wyndham"}
                       defaultValue={details.number || ""}
                     />
                   </label>
@@ -3376,6 +3382,51 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
             </>
           )}
           {error && <div className="alert error">{error}</div>}
+        </Dialog>
+      )}
+      {relocation && owner && (
+        <Dialog title={`Move stay from room ${relocation.number}`} close={() => setRelocation(null)}>
+          <p className="form-help">
+            Choose a numbered {relocationType === "premium" ? "Premium" : "Superior"} room.
+            Room {relocation.number} keeps its hotel-listed number and {relocation.category} type.
+            The placement review checks capacity, reservations, locks and sharing before anything changes.
+          </p>
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            if (!relocationTarget || !relocationAssignments.length) return;
+            const result = await action("/assignments/preview", {
+              revision: data.revision,
+              moves: relocationAssignments.map((a) => ({
+                guest_id: a.guest_id, night: a.night, resource_id: relocationTarget,
+              })),
+            });
+            if (result) { setRelocation(null); openPreview(result); }
+          }}>
+            <label className="checkbox-label">
+              <input type="checkbox" checked={relocationBothNights}
+                onChange={(e) => setRelocationBothNights(e.target.checked)} />
+              Move this room’s occupants on both nights
+            </label>
+            <p className="form-help">
+              {relocationAssignments.length} person-night{relocationAssignments.length === 1 ? "" : "s"} will be reviewed
+              {relocationBothNights ? " across 24 and 25 Nov" : ` for ${dayName(night)}`}.
+            </p>
+            <label>
+              Destination room
+              <select required value={relocationTarget} onChange={(e) => setRelocationTarget(e.target.value)}>
+                <option value="">Choose a {relocationType} room</option>
+                {relocationRooms.map((r) => <option key={r.id} value={r.id}>
+                  {roomName(r)} · Block {r.block} · {r.floor === 0 ? "Ground" : "First"} floor
+                </option>)}
+              </select>
+            </label>
+            <div className="dialog-actions">
+              <button className="primary compact" disabled={busy || !relocationTarget || !relocationAssignments.length}>
+                Review room move <ArrowRight size={15} />
+              </button>
+            </div>
+          </form>
+          {error && <div className="alert error" role="alert">{error}</div>}
         </Dialog>
       )}
       {pickerRoom && owner && (
