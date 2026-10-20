@@ -383,6 +383,9 @@ def test_money_nights_staff_meals_ages_and_unknown_prices():
     for i in range(13):data['assignments'][i]['resource_id']='s'
     hotel=calculate(data,policy,settings,meals,list(NIGHTS))
     assert sum(l['amount_paise'] for l in hotel['lines'] if l['kind']=='second_hotel_property')==3600000
+    assert not any(u['kind']=='second_extra' for u in hotel['unpriced'])
+    data['assignments'][0]['separate_bed']=True
+    hotel=calculate(data,policy,settings,meals,list(NIGHTS))
     assert any(u['kind']=='second_extra' and u['quantity']==1 for u in hotel['unpriced']) and not hotel['complete']
 
 
