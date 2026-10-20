@@ -20,6 +20,7 @@ import {
 } from "@xyflow/react";
 import {
   ArrowRight,
+  Bell,
   Check,
   Download,
   LockKeyhole,
@@ -974,6 +975,21 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
     );
   const summary = data.summary[night];
   const currentJob = jobs[0];
+  const reservePending = owner && data.reserved_count !== 4;
+  const sourcePending = data.guests.some((g) =>
+    g.tags.includes("arrival_unconfirmed") || g.tags.includes("headcount_unconfirmed"));
+  const notificationCount = Number(Boolean(notice)) + Number(reservePending) +
+    Number(sourcePending) + Number(summary.unconfirmed_ages > 0) + Number(owner && Boolean(currentJob));
+  const jobMessage = currentJob && (
+    ["queued", "running"].includes(currentJob.status)
+      ? "The worker is considering family groups, capacities, eligibility and locks."
+      : currentJob.status === "applied"
+        ? "This automatic proposal has been applied to the plan."
+        : currentJob.status === "stale"
+          ? "The plan changed. Run a fresh proposal."
+          : currentJob.result?.assignments
+            ? `${currentJob.result.assigned_count} person-nights placed · ${currentJob.result.unassigned?.length || 0} person-nights unassigned`
+            : (currentJob.result?.diagnostics || []).join(" "));
   const currentMeals = Object.fromEntries(
     allMeals
       .filter(
@@ -1024,21 +1040,50 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                     : "Drag a person or family to a room, or select them and tap a room."}
           </p>
         </div>
-        <span className="live-label">
-          <i />
-          Live · Revision {data.revision}
-        </span>
+        <div className="planner-heading-actions">
+          <span className="live-label"><i /> Live · Revision {data.revision}</span>
+          <details className="notification-center">
+            <summary aria-label={`Notifications, ${notificationCount} items`}>
+              <Bell size={18} />
+              <span>Notifications</span>
+              {notificationCount > 0 && <b>{notificationCount}</b>}
+            </summary>
+            <div className="notification-panel">
+              <div className="notification-panel-heading">
+                <strong>Planning updates</strong>
+                <small>{notificationCount} items</small>
+              </div>
+              {notice && <article className="notification-item success"><b>Update saved</b><p>{notice}</p></article>}
+              {reservePending && <article className="notification-item info"><b>Four Premium rooms</b><p>Held unused as a reserve pool across both nights. Choose their numbers later in Rooms & rules.</p></article>}
+              {sourcePending && <article className="notification-item warning"><b>Source details pending</b><p>Some arrivals use 24 Nov as a draft and blank child counts still need confirmation. Final attendance may change.</p></article>}
+              {summary.unconfirmed_ages > 0 && <article className="notification-item warning"><b>{summary.unconfirmed_ages} ages to confirm</b><p>Check who is 50+ or needs a ground-floor room before finalising this night.</p></article>}
+              {owner && currentJob && <article className="notification-item info">
+                <b>Automatic proposal · {currentJob.status === "completed" ? currentJob.result?.solver_status : currentJob.status}</b>
+                <p>{jobMessage}</p>
+                {currentJob.status === "completed" && currentJob.result?.assignments && <button
+                  className="secondary compact" disabled={busy}
+                  onClick={async () => {
+                    const result = await action("/allocation/" + currentJob.id + "/preview", { revision: data.revision });
+                    if (result) openPreview(result);
+                  }}>Review proposal <ArrowRight size={15} /></button>}
+                {currentJob.result?.unassigned?.length > 0 && <details>
+                  <summary>See who remains unassigned</summary>
+                  {currentJob.result.unassigned.map((u: any) => <p key={u.guest_id + u.night}>
+                    {guestName(data.guests.find((g) => g.id === u.guest_id))} · {dayName(u.night)}: {u.reasons.join(" ")}
+                  </p>)}
+                </details>}
+              </article>}
+              {!notificationCount && <p className="notification-empty">All caught up. Planning updates will appear here.</p>}
+            </div>
+          </details>
+        </div>
       </div>
       {error && (
         <div role="alert" className="alert error">
           {error}
         </div>
       )}
-      {notice && (
-        <div role="status" className="alert">
-          {notice}
-        </div>
-      )}
+      {notice && <span role="status" className="sr-only">{notice}</span>}
       <div className="planner-toolbar">
         <label className="search-box">
           <Search size={16} />
@@ -1732,31 +1777,6 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
               </>
             )}
           </div>
-          {owner && data.reserved_count !== 4 && (
-            <div className="alert">
-              Four Premium rooms are held unused as a reserve pool across both
-              nights. Choose their numbers later in Rooms & rules.
-            </div>
-          )}
-          {data.guests.some(
-            (g) =>
-              g.tags.includes("arrival_unconfirmed") ||
-              g.tags.includes("headcount_unconfirmed"),
-          ) && (
-            <div className="alert">
-              Source details pending: some arrivals use 24 Nov as a draft and
-              blank child counts still need confirmation. The roster includes
-              only listed people; final attendance may change.
-            </div>
-          )}
-          {summary.unconfirmed_ages > 0 && (
-            <div className="alert">
-              Provisional plan: {summary.unconfirmed_ages} exact ages are
-              unconfirmed for this night. Supplied adult/child counts guide
-              placement and estimates. Check who is 50+ or needs ground floor
-              before finalising.
-            </div>
-          )}
           <div className="room-view-controls">
             <button
               className={
@@ -1785,57 +1805,6 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
               {hotel === "staff" ? "beds" : "rooms"} · scroll for the full list
             </span>
           </div>
-          {owner && currentJob && (
-            <div className="job-panel">
-              <div>
-                <b>
-                  Automatic proposal ·{" "}
-                  {currentJob.status === "completed"
-                    ? currentJob.result?.solver_status
-                    : currentJob.status}
-                </b>
-                <p>
-                  {["queued", "running"].includes(currentJob.status)
-                    ? "The worker is considering family groups, capacities, eligibility and locks."
-                    : currentJob.status === "applied"
-                      ? "This automatic proposal has been applied to the plan."
-                      : currentJob.status === "stale"
-                        ? "The plan changed. Run a fresh proposal."
-                        : currentJob.result?.assignments
-                          ? `${currentJob.result.assigned_count} person-nights placed · ${currentJob.result.unassigned?.length || 0} person-nights unassigned`
-                          : (currentJob.result?.diagnostics || []).join(" ")}
-                </p>
-              </div>
-              {currentJob.status === "completed" &&
-                currentJob.result?.assignments && (
-                  <button
-                    className="secondary compact"
-                    disabled={busy}
-                    onClick={async () => {
-                      const result = await action(
-                        "/allocation/" + currentJob.id + "/preview",
-                        { revision: data.revision },
-                      );
-                      if (result) openPreview(result);
-                    }}
-                  >
-                    Review proposal
-                    <ArrowRight size={15} />
-                  </button>
-                )}
-              {currentJob.result?.unassigned?.length > 0 && (
-                <details>
-                  <summary>See who remains unassigned</summary>
-                  {currentJob.result.unassigned.map((u: any) => (
-                    <p key={u.guest_id + u.night}>
-                      {guestName(data.guests.find((g) => g.id === u.guest_id))}{" "}
-                      · {dayName(u.night)}: {u.reasons.join(" ")}
-                    </p>
-                  ))}
-                </details>
-              )}
-            </div>
-          )}
           <div className="mobile-planner-tabs">
             {["guests", "rooms", "summary"].map((p) => (
               <button

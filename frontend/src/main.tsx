@@ -5,22 +5,43 @@ import {
   BedDouble,
   Building2,
   CalendarDays,
-  Check,
   ChevronRight,
   Eye,
   Flower2,
-  KeyRound,
   LayoutGrid,
   LockKeyhole,
   LogOut,
   Plus,
   ShieldCheck,
+  Moon,
+  Sun,
   UsersRound,
   X,
 } from "lucide-react";
 import "./style.css";
 import { PlanningWorkspace } from "./planning";
 import "./wedding-theme.css";
+import "./aadi-theme.css";
+
+type Theme = "light" | "dark";
+const initialTheme: Theme = (() => {
+  try {
+    const saved = localStorage.getItem("planner-theme");
+    if (saved === "light" || saved === "dark") return saved;
+  } catch { /* Theme storage is optional. */ }
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+})();
+document.documentElement.dataset.theme = initialTheme;
+
+function ThemeToggle({ theme, onToggle }: { theme: Theme; onToggle: () => void }) {
+  return (
+    <button type="button" className="theme-toggle" onClick={onToggle}
+      aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+      title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
+      {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+    </button>
+  );
+}
 
 type User = {
   id: string;
@@ -80,6 +101,13 @@ const rupees = (paise: number) =>
   }).format(paise / 100);
 
 function App() {
+  const [theme, setTheme] = useState<Theme>(initialTheme);
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#0d1423" : "#f4f7ff");
+    try { localStorage.setItem("planner-theme", theme); } catch { /* Theme storage is optional. */ }
+  }, [theme]);
+  const toggleTheme = () => setTheme((current) => current === "dark" ? "light" : "dark");
   const [user, setUser] = useState<User | null>(null),
     [csrf, setCsrf] = useState(""),
     [loading, setLoading] = useState(true),
@@ -318,59 +346,25 @@ function App() {
   if (!user)
     return (
       <main className="auth-layout">
-        <section className="auth-story">
+        <header className="auth-topbar">
           <div className="brand">
-            <span className="brand-mark">
-              <Flower2 />
-            </span>
-            <span>
-              ROOM TO
-              <br />
-              <b>CELEBRATE</b>
-            </span>
+            <span className="brand-mark"><Flower2 /></span>
+            <strong>ROOM TO CELEBRATE</strong>
           </div>
-          <div className="story-copy">
-            <span className="eyebrow">ONE CELEBRATION. EVERYONE TOGETHER.</span>
-            <h1>
-              A place
-              <br />
-              for everyone.
-            </h1>
-            <p>
-              A little less juggling.
-              <br />A little more celebrating.
-            </p>
-            <div className="invitation-date">
-              <CalendarDays size={18} />
-              24–26 November 2026
-            </div>
+          <div className="auth-top-actions">
+            <span className="auth-event-pill"><CalendarDays size={16} /> 24–26 NOV 2026</span>
+            <ThemeToggle theme={theme} onToggle={toggleTheme} />
           </div>
-          <div className="map-art" aria-hidden="true">
-            <div className="arch">
-              <Flower2 size={46} />
-            </div>
-            <div className="art-room">
-              <BedDouble />
-              Family together<span>Ground floor</span>
-            </div>
-            <div className="art-room art-room-two">
-              <Check />A thoughtful stay<span>Everyone considered</span>
-            </div>
-            <div className="art-dots" />
-          </div>
-          <footer>Thoughtful planning. A warm welcome.</footer>
-        </section>
+        </header>
         <section className="auth-form-area">
           <form className="auth-card" onSubmit={authenticate}>
-            <span className="round-icon">
-              <KeyRound />
-            </span>
-            <span className="eyebrow">YOUR PRIVATE PLANNING SPACE</span>
-            <h2>{setup ? "Make it yours." : "Welcome back."}</h2>
+            <div className="auth-card-brand"><span className="brand-mark"><Flower2 /></span><strong>ROOM TO CELEBRATE</strong></div>
+            <span className="eyebrow">PRIVATE WEDDING WORKSPACE</span>
+            <h1>{setup ? "Create your workspace" : "Sign in to the room planner"}</h1>
             <p>
               {setup
                 ? "Create the one owner account. Full-access editors can be added later from Users & access."
-                : "Sign in to bring the accommodation plan together."}
+                : "Use your assigned planner username and password."}
             </p>
             {error && (
               <div role="alert" className="alert error">
@@ -448,10 +442,8 @@ function App() {
               Private access. No public guest list.
             </div>
           </form>
-          <span className="auth-caption">
-            Wedding accommodation planner · Private workspace
-          </span>
         </section>
+        <footer className="auth-footer">Wedding accommodation planner · Private workspace</footer>
       </main>
     );
 
@@ -542,14 +534,6 @@ function App() {
             </button>
           )}
         </nav>
-        <div className="coming-card">
-          <span className="tiny-label">A THOUGHTFUL STAY</span>
-          <b>People make the plan.</b>
-          <p>
-            Keep families together. Review warnings. Make every guest feel
-            welcome.
-          </p>
-        </div>
         <div className="sidebar-bottom">
           <span className="avatar">
             {user.display_name.slice(0, 1).toUpperCase()}
@@ -593,6 +577,7 @@ function App() {
             <LockKeyhole size={13} />
             {owner ? "Editing access" : "View only"}
           </span>
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
         </header>
         <main className="main-content">
           {error && (

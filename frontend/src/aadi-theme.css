@@ -1,0 +1,372 @@
+/* AADI-inspired application shell. All values are planner-local design tokens. */
+:root {
+  font-family: Inter, "Noto Sans Devanagari", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+  --canvas: #f4f7ff;
+  --surface: #ffffff;
+  --surface-raised: #f9fbff;
+  --elevated: #eaf1ff;
+  --ink: #18243b;
+  --muted: #5b6983;
+  --line: #d8e2f2;
+  --action: #075dce;
+  --action-hover: #004dad;
+  --on-action: #ffffff;
+  --info: #075dce;
+  --info-bg: #eaf2ff;
+  --success: #086c59;
+  --success-bg: #e3f8f1;
+  --warning: #8f5800;
+  --warning-bg: #fff4da;
+  --error: #ad2346;
+  --error-bg: #fff0f2;
+  --on-error-badge: #ffffff;
+  --bride: #bc275e;
+  --bride-bg: #fff0f6;
+  --groom: #087b9f;
+  --groom-bg: #e7f8ff;
+  --mixed: #7051ba;
+  --mixed-bg: #f2edff;
+  --room-empty: #f8fbff;
+  --canvas-room: #edf4ff;
+  --sidebar-start: #183987;
+  --sidebar-end: #422a90;
+  --sidebar-ink: #f8faff;
+  --shadow: 0 10px 30px #294b8412, 0 2px 6px #233f7010;
+  --font-editorial: Inter, "Noto Sans Devanagari", "Segoe UI", system-ui, sans-serif;
+  --green: var(--action);
+  --paper: var(--canvas);
+  --cream: var(--canvas);
+  --forest: var(--action);
+  --ivory: var(--surface);
+  --gold: #ffd978;
+  --border: var(--line);
+  --wine: var(--bride);
+  background: var(--canvas);
+  color: var(--ink);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #0d1423;
+  --surface: #172236;
+  --surface-raised: #1d2b42;
+  --elevated: #223552;
+  --ink: #edf4ff;
+  --muted: #b2c0d5;
+  --line: #364863;
+  --action: #5ba4ff;
+  --action-hover: #83b8ff;
+  --on-action: #06172e;
+  --info: #89bcff;
+  --info-bg: #173960;
+  --success: #6ce2bd;
+  --success-bg: #153f37;
+  --warning: #ffd17d;
+  --warning-bg: #4a3314;
+  --error: #ff9fb0;
+  --error-bg: #4d2030;
+  --on-error-badge: #2d0713;
+  --bride: #ff91ba;
+  --bride-bg: #43253a;
+  --groom: #83d9f5;
+  --groom-bg: #153d51;
+  --mixed: #c1a7ff;
+  --mixed-bg: #342b57;
+  --room-empty: #1a2a42;
+  --canvas-room: #111f34;
+  --sidebar-start: #131f45;
+  --sidebar-end: #211b49;
+  --sidebar-ink: #f0f5ff;
+  --shadow: 0 12px 32px #0007;
+}
+body, .main-content, .workspace-content, .main-shell { background: var(--canvas); color: var(--ink); }
+h1, h2, .planning-workspace h1, .planning-workspace h2,
+.attendance-card .section-heading h2, .night-cost-grid .settings-card > strong {
+  font-family: var(--font-editorial);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  color: var(--ink);
+}
+.eyebrow, .tiny-label { color: var(--info); letter-spacing: .11em; }
+.page-heading { border-bottom: 1px solid var(--line); }
+.page-heading h1, .planning-workspace h1 { color: var(--ink); }
+.page-heading p, .planning-workspace p, .breadcrumb,
+.live-label, .small-field, .guest-total, .form-help { color: var(--muted); }
+.heading-dot { color: #e94a86; }
+.sidebar {
+  background: linear-gradient(165deg, var(--sidebar-start), var(--sidebar-end));
+  color: var(--sidebar-ink);
+  border-right: 0;
+}
+.sidebar .brand { color: var(--sidebar-ink); margin-bottom: 48px; }
+.brand-mark { border: 0; border-radius: 11px; background: #fff3; color: inherit; }
+.nav-caption, .sidebar-bottom small { color: #d1deff; }
+.nav-item { color: #edf2ff; border-radius: 11px; font-weight: 550; }
+.nav-item.active, .nav-item:hover { color: #fff; background: #ffffff2d; box-shadow: inset 3px 0 #81eff0; }
+.sidebar-bottom { border-color: #ffffff35; margin-top: auto; }
+.sidebar-bottom strong { color: #fff; }
+.avatar { background: #ffffff2e; color: #fff; border-color: #ffffff55; }
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 2px 14px #1b3e7310;
+}
+.breadcrumb b, .date-pill, .access-pill { color: var(--ink); }
+.date-pill { border-color: var(--line); background: var(--elevated); }
+.theme-toggle {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--action);
+}
+.theme-toggle:hover { background: var(--elevated); }
+.primary {
+  background: var(--action);
+  border-color: var(--action);
+  color: var(--on-action);
+  border-radius: 11px;
+  box-shadow: 0 5px 12px #075dce33;
+}
+.primary:hover { background: var(--action-hover); color: var(--on-action); }
+.secondary {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--action);
+  border-radius: 10px;
+}
+.secondary:hover { background: var(--elevated); color: var(--action); }
+button:focus-visible, a:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible, summary:focus-visible {
+  outline: 3px solid #56b7ed;
+  outline-offset: 3px;
+}
+input, select, textarea, .search-box, .small-field select,
+.planning-dialog input:not([type="checkbox"]), .planning-dialog select,
+.planning-dialog textarea, .meal-table select {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink);
+  border-radius: 10px;
+}
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: .8; }
+label, .planning-dialog form > label, .planning-dialog .form-row > label,
+.planning-dialog fieldset > label, .planning-dialog .rate-grid > label { color: var(--ink); }
+label small, .planning-dialog .checkbox-label { color: var(--muted); }
+input[type="checkbox"] { accent-color: var(--action); }
+.alert { background: var(--info-bg); border-color: var(--info); color: var(--info); }
+.alert.error { background: var(--error-bg); border-color: var(--error); color: var(--error); }
+.live-label i { background: #11b98c; box-shadow: 0 0 0 4px #11b98c24; }
+.family-panel, .settings-card, .guest-drawer, .topology-panel,
+.live-summary, .planner-summary, .room-drawer, .planning-dialog,
+.modal, .summary-panel, .stat, .accounts-panel, .permission-banner,
+.inventory-panel, .attendance-card {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+.family-heading, .canvas-caption, .planner-summary h2,
+.live-summary-row, .history-row, .settings-items > div,
+.cost-line, .family-flags, .planning-workspace td { border-color: var(--line); }
+.family-heading > b, .planning-workspace td small,
+.settings-card > p, .settings-items small, .history-row small,
+.attendance-card p, .summary-cost > small, .summary-cost p,
+.drawer-title > span, .drawer-help, .canvas-caption > span,
+.room-meta, .room-capacity, .room-people small, .room-vacant,
+.planning-workspace th, .live-summary-row { color: var(--muted); }
+.family-flags span, .reservation-chips span {
+  color: var(--info); border-color: var(--line); background: var(--info-bg);
+}
+.side-badge.bride, .plan-room.bride { background: var(--bride-bg); color: var(--bride); border-color: var(--bride); }
+.side-badge.groom, .plan-room.groom { background: var(--groom-bg); color: var(--groom); border-color: var(--groom); }
+.plan-room.mixed { background: var(--mixed-bg); border-color: var(--mixed); color: var(--mixed); }
+.side-dot.bride { background: var(--bride); }
+.side-dot.groom { background: var(--groom); }
+.side-dot.mixed { background: var(--mixed); }
+.side-dot.empty { background: var(--muted); }
+.side-text.bride { color: var(--bride); }
+.side-text.groom { color: var(--groom); }
+.all-room-grid, .flow-canvas { background: var(--canvas-room); }
+.plan-room, .room-card, .guest-choice, .member-cards fieldset,
+.room-checkbox-grid > label, .unpriced-card, .function-timeline article {
+  background: var(--room-empty);
+  color: var(--ink);
+  border-color: var(--line);
+  border-radius: 12px;
+}
+.plan-room { border-left-color: var(--action); }
+.plan-room.reserved { background: var(--warning-bg); border-color: var(--warning); }
+.plan-room-title > b, .room-people > span { color: var(--ink); }
+.plan-room-title > span, .reservation-label { color: var(--warning); }
+.room-capacity, .canvas-caption { border-color: var(--line); }
+.guest-choice small, .guest-choice em, .member-cards legend,
+.family-room-type legend { color: var(--muted); }
+.guest-choice.chosen, .selected-control {
+  background: var(--info-bg) !important;
+  border-color: var(--action) !important;
+  box-shadow: 0 0 0 2px var(--action) !important;
+}
+.live-summary { background: var(--surface-raised); }
+.live-summary h2, .live-summary-row > b, .summary-cost > b { color: var(--ink); }
+.overage, .unpriced-card, .selection-banner { background: var(--warning-bg); border-color: var(--warning); color: var(--warning); }
+.segmented button { background: var(--elevated); color: var(--muted); }
+.segmented button.active { background: var(--action); color: var(--on-action); }
+.planning-workspace th, th { background: var(--elevated); color: var(--ink); }
+.planning-workspace td, td { color: var(--ink); border-color: var(--line); }
+.planning-empty { border-color: var(--line); color: var(--muted); }
+.planning-empty h2 { color: var(--ink); }
+.planning-dialog .form-row, .family-room-type { border-color: var(--line); }
+.modal-backdrop, .planning-backdrop { background: #081529ae; }
+.modal h2, .planning-dialog h2, .wedding-family-columns h3,
+.function-timeline h3 { color: var(--ink); }
+.wedding-family-columns dt, .wedding-family-columns dd,
+.function-timeline a, .family-detail-row legend { color: var(--muted); }
+.family-detail-row, .function-timeline article { border-color: var(--line); }
+.planning-dialog input[type="checkbox"], .meal-table input[type="checkbox"] { accent-color: var(--action); }
+.stat > strong, .stat > b, .inventory-toolbar h2, .section-heading h2,
+.summary-row b, .pricing > div b, td strong, .block-title > span,
+.room-number, .premium .room-number { color: var(--ink); }
+.stat > small, .inventory-toolbar p, .section-heading span, td small,
+.block-title small, .floor-label, .floor-label span,
+.pricing > div span, .pricing > small, .summary-note,
+.summary-row, .inventory-footer, .inventory-footer small,
+.page-footer, .page-footer > span { color: var(--muted); }
+.block, .inventory-footer, .status-badge { background: var(--surface-raised); border-color: var(--line); }
+.property-tabs, .inventory-footer, .pricing, .foundation-tag { border-color: var(--line); }
+.property-tabs button { color: var(--muted); }
+.property-tabs button.selected { color: var(--action); border-bottom-color: var(--action); }
+.reserve-note, .warning-review { background: var(--warning-bg); border-color: var(--warning); color: var(--warning); }
+.room-card.premium, .room-card.premium:hover { background: var(--mixed-bg); border-color: var(--mixed); color: var(--mixed); }
+.room-card:hover { background: var(--elevated); border-color: var(--action); }
+.room-card small, .room-card.premium small { color: var(--muted); }
+.permission-banner { background: var(--info-bg); color: var(--info); }
+.permission-banner strong, .permission-banner p { color: var(--ink); }
+.text-button { color: var(--action); }
+.status-badge { color: var(--success); }
+.status-badge.suspended { background: var(--error-bg); color: var(--error); border-color: var(--error); }
+.foundation-tag { color: var(--muted); }
+.mobile-planner-tabs { background: var(--elevated); border-color: var(--line); }
+.mobile-planner-tabs button { color: var(--muted); }
+.mobile-planner-tabs button.active { background: var(--action); color: var(--on-action); }
+
+/* Keep planning messages available without pushing the room grid down. */
+.planner-heading-actions { display: flex; align-items: center; gap: 14px; }
+.notification-center { position: relative; z-index: 12; }
+.notification-center > summary {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.notification-center > summary::-webkit-details-marker { display: none; }
+.notification-center > summary b {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 50px;
+  background: var(--error);
+  color: var(--on-error-badge);
+  font-size: 10px;
+}
+.notification-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  width: min(410px, calc(100vw - 32px));
+  max-height: min(70vh, 590px);
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 20px 50px #0b1d4240;
+}
+.notification-panel-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 4px 4px 12px; }
+.notification-panel-heading strong { font-size: 15px; }
+.notification-panel-heading small { color: var(--muted); }
+.notification-item { padding: 13px 14px; margin-top: 8px; border: 1px solid var(--line); border-left-width: 4px; border-radius: 11px; background: var(--surface-raised); }
+.notification-item b { display: block; font-size: 12px; color: var(--ink); }
+.notification-item p { margin: 6px 0 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
+.notification-item.success { border-left-color: var(--success); background: var(--success-bg); }
+.notification-item.info { border-left-color: var(--info); background: var(--info-bg); }
+.notification-item.warning { border-left-color: var(--warning); background: var(--warning-bg); }
+.notification-item .secondary { margin-top: 10px; }
+.notification-item details { margin-top: 10px; font-size: 11px; }
+.notification-item details summary { cursor: pointer; color: var(--action); font-weight: 650; }
+.notification-empty { padding: 18px 5px; font-size: 12px; color: var(--muted); }
+
+/* AADI-style compact sign-in, scoped to the planner's existing credentials. */
+.auth-layout { min-height: 100svh; display: flex; flex-direction: column; background: var(--canvas); }
+.auth-topbar {
+  min-height: 66px;
+  padding: 10px 26px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.auth-topbar .brand, .auth-card-brand { color: var(--ink); font-size: 15px; font-weight: 750; letter-spacing: .045em; }
+.auth-topbar .brand-mark, .auth-card-brand .brand-mark { background: var(--action); color: var(--on-action); }
+.auth-top-actions { display: flex; align-items: center; gap: 10px; }
+.auth-event-pill { display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 11px; font-size: 11px; font-weight: 650; background: var(--surface-raised); }
+.auth-form-area { flex: 1; padding: 40px 20px 60px; background: radial-gradient(ellipse at 50% 0%, #3477ed1e, transparent 66%), var(--canvas); }
+.auth-card { max-width: 460px; padding: 38px; border: 1px solid var(--line); border-radius: 24px; background: var(--surface); box-shadow: var(--shadow); }
+.auth-card-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
+.auth-card-brand .brand-mark { width: 40px; height: 40px; }
+.auth-card .eyebrow { color: var(--info); font-size: 10px; letter-spacing: .13em; }
+.auth-card h1 { margin: 10px 0 8px; font-size: clamp(24px, 3vw, 31px); line-height: 1.2; color: var(--ink); }
+.auth-card > p { color: var(--muted); font-size: 13px; line-height: 1.5; margin-bottom: 24px; }
+.auth-card label { margin-bottom: 17px; color: var(--ink); font-size: 13px; }
+.auth-card input { min-height: 46px; font-size: 14px; }
+.auth-card .primary { min-height: 46px; margin-top: 8px; }
+.privacy-line { color: var(--muted); margin-top: 20px; font-size: 11px; }
+.auth-footer { text-align: center; padding: 18px 20px; border-top: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 11px; }
+.loading { background: var(--canvas); color: var(--ink); }
+
+@media (max-width: 900px) {
+  .planner-heading-actions { flex-wrap: wrap; justify-content: flex-end; }
+}
+@media (max-width: 700px) {
+  .sidebar { background: linear-gradient(110deg, var(--sidebar-start), var(--sidebar-end)); }
+  .sidebar .brand { margin: 0; }
+  .sidebar-bottom { margin: 0; }
+  .topbar { padding: 0 16px; gap: 8px; }
+  .topbar .theme-toggle { width: 38px; height: 38px; }
+  .main-content { padding: 24px 16px; }
+  .planning-workspace .page-heading { align-items: flex-start; }
+  .planner-heading-actions { align-items: flex-end; gap: 9px; }
+  .notification-center > summary span { display: none; }
+  .notification-center > summary { padding: 8px 10px; min-height: 39px; }
+  .notification-panel { position: fixed; top: 105px; right: 12px; width: calc(100vw - 24px); max-height: calc(100svh - 120px); }
+  .auth-topbar { padding: 8px 15px; min-height: 58px; }
+  .auth-topbar .brand { font-size: 11px; }
+  .auth-topbar .brand-mark { width: 34px; height: 34px; }
+  .auth-event-pill { display: none; }
+  .auth-form-area { padding: 25px 14px 40px; }
+  .auth-card { padding: 26px 20px; border-radius: 19px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
