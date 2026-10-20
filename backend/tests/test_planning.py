@@ -223,6 +223,11 @@ def test_family_room_type_selection_controls_moves_allocation_and_edit_review(cl
     review=imported.json()
     assert client.post('/api/planning/import/apply',json={'revision':review['revision'],'token':review['token'],'acknowledged':[w['id'] for w in review['warnings']]},headers=headers(owner)).status_code==200
     assert plan(client)['families'][0]['required_room_type']=='superior'
+    older_form={**body,'revision':revision(client),'label':'Synthetic Family renamed'}
+    older_form.pop('required_room_type')
+    updated=client.put('/api/planning/families/'+people[0]['family_id'],json=older_form,headers=headers(owner))
+    assert updated.status_code==200,updated.text
+    assert plan(client)['families'][0]['required_room_type']=='superior'
 
 
 def snapshot_for_test(client):
