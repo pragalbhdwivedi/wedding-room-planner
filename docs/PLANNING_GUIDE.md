@@ -16,6 +16,8 @@ In **Rooms & rules**, select exactly four Premium rooms. They are excluded from 
 
 The planner opens on all 44 Wyndham rooms in a scrollable grid. Switch to Topology for the schematic canvas, or filter by property/block/floor. The second hotel and 12 staff beds remain separate inventories. **Edit layout** moves room cards and saves their schematic coordinates. It does not establish real corridor proximity. Add confirmed neighbouring/opposite connections and mark a room near the restaurant only when you know those facts. The second hotel's six initial room labels are explicitly unnumbered placeholders.
 
+Open a Wyndham room's details to **Upgrade to Premium** or **Downgrade to Superior**. This changes its current adult-counted capacity to four or three on both nights. A change is refused if it would break an existing placement or the four-Premium family reserve. **Change room number** updates the displayed number of a Wyndham or second-hotel room while preserving its stable identity, assignments and locks; numbers must be unique within each hotel. These are planner changes; confirm any actual category change with the hotel separately.
+
 ## 3. Place and arrange
 
 Select a family/person then tap a room, or drag them to a card. Green outlines identify eligible destinations; a blocked destination explains its conflict. Review the exact guest/night/from/to list before applying. Warnings need individual confirmation; mandatory capacity, staff separation, reservation and access rules cannot be overridden.
@@ -50,7 +52,7 @@ Download the owner template or export your current plan. Import only the **Guest
 
 Other sessions refresh live; stale writes/previews are rejected. Review again after another change. There is no offline-editing mode. All actual guest information stays in the private database and exports, outside the public repository.
 
-Trusted HTTPS, backup/restore work and owner acceptance remain tracked separately in STATUS.md and OPEN_ITEMS.md.
+HTTPS sign-in is verified; backup/restore work and final event-use acceptance remain tracked separately in STATUS.md and OPEN_ITEMS.md.
 
 
 ## 7. Invitation context

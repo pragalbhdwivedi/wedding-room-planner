@@ -267,7 +267,7 @@ def room_settings(resource_id:str,body:RoomInput,user:Owner,db:DB):
     resource=db.get(Resource,resource_id)
     if not resource:raise HTTPException(404,"Room/bed not found")
     resource.near_restaurant=body.near_restaurant
-    if resource.room_id:
+    if resource.room_id and "number" in body.model_fields_set:
         room=db.get(Room,resource.room_id)
         if room.hotel_id=="second":
             number=body.number.strip() if body.number else None
@@ -275,6 +275,47 @@ def room_settings(resource_id:str,body:RoomInput,user:Owner,db:DB):
             room.number=number
     db.flush();verify_edit(db,before)
     return record(db,user,state,"room.settings_updated",{"resource_id":resource_id})
+
+
+class RoomNumberInput(Revision):
+    number:str|None=Field(default=None,max_length=16)
+
+
+@router.put("/rooms/{resource_id}/number",dependencies=WRITE)
+def room_number(resource_id:str,body:RoomNumberInput,user:Owner,db:DB):
+    state=locked_state(db,body.revision)
+    resource=db.get(Resource,resource_id)
+    room=db.get(Room,resource.room_id) if resource and resource.room_id else None
+    if not room:raise HTTPException(400,"Only hotel rooms have room numbers.")
+    number=body.number.strip() if body.number else None
+    if room.hotel_id=="wyndham" and not number:raise HTTPException(400,"Enter a Wyndham room number.")
+    if room.number==number:raise HTTPException(400,"This room already has that number.")
+    if number and db.scalar(select(Room.id).where(Room.hotel_id==room.hotel_id,Room.number==number,Room.id!=room.id)):
+        raise HTTPException(409,"That room number is already used at this hotel.")
+    previous=room.number
+    room.number=number
+    return record(db,user,state,"room.number_updated",{"resource_id":resource_id,"from":previous,"to":number})
+
+
+class RoomCategoryInput(Revision):
+    category:Literal["superior","premium"]
+
+
+@router.put("/rooms/{resource_id}/category",dependencies=WRITE)
+def room_category(resource_id:str,body:RoomCategoryInput,user:Owner,db:DB):
+    state=locked_state(db,body.revision);before=snapshot(db)
+    resource=db.get(Resource,resource_id)
+    room=db.get(Room,resource.room_id) if resource and resource.room_id else None
+    if not room or room.hotel_id!="wyndham":raise HTTPException(400,"Only Wyndham guest rooms can be upgraded or downgraded.")
+    if room.category==body.category:raise HTTPException(400,"This room already has that category.")
+    if resource.reserved and body.category!="premium":raise HTTPException(409,"Choose a different Premium family reservation before downgrading this room.")
+    premium_count=sum(r["hotel_id"]=="wyndham" and r["category"]=="premium" for r in before["resources"])
+    if body.category=="superior" and premium_count<=4:raise HTTPException(409,"Keep at least four Premium rooms available for the family reserve.")
+    previous=room.category
+    room.category=body.category
+    room.adult_capacity=4 if body.category=="premium" else 3
+    db.flush();verify_edit(db,before)
+    return record(db,user,state,"room.category_updated",{"resource_id":resource_id,"from":previous,"to":body.category})
 
 
 class LinkInput(Revision):

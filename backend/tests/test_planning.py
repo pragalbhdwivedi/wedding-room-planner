@@ -104,6 +104,8 @@ def test_scope_no_cost_contact_or_mutation_leak(client,owner,role,side):
     assert viewer.post('/api/planning/families',json={'revision':d['revision'],'label':'Cannot Edit','side':'bride','members':[member()]},headers=h).status_code==403
     assert viewer.post('/api/planning/families/apply',json={'revision':d['revision'],'token':'00000000-0000-0000-0000-000000000001'},headers=h).status_code==403
     assert viewer.put('/api/planning/reservations',json={'revision':d['revision'],'room_ids':['w-101','w-103','w-201','w-203']},headers=h).status_code==403
+    assert viewer.put('/api/planning/rooms/w-102/category',json={'revision':d['revision'],'category':'premium'},headers=h).status_code==403
+    assert viewer.put('/api/planning/rooms/w-102/number',json={'revision':d['revision'],'number':'102A'},headers=h).status_code==403
     assert viewer.post('/api/planning/assignments/preview',json={'revision':d['revision'],'moves':[{'guest_id':bride[0]['id'],'night':NIGHTS[0],'resource_id':'w-104'}]},headers=h).status_code==403
     if role=='family':
         expected=bride if side=='bride' else groom;other=groom if side=='bride' else bride
@@ -464,6 +466,66 @@ def test_unnamed_reserve_pool_is_shared_across_nights_and_solver_preserves_four(
     assert len({a['resource_id'] for a in result['assignments']})<=20
     assert len(result['unassigned'])==2 and not validate(data,result['assignments'])['errors']
     assert sum(r['id'] not in {a['resource_id'] for a in result['assignments']} for r in premium)>=4
+
+
+def test_room_upgrade_downgrade_updates_capacity_without_invalidating_placements(client,owner):
+    room=lambda rid:next(r for r in plan(client)['resources'] if r['id']==rid)
+    before=revision(client)
+    upgraded=client.put('/api/planning/rooms/w-102/category',json={'revision':before,'category':'premium'},headers=headers(owner))
+    assert upgraded.status_code==200,upgraded.text
+    assert room('w-102')['category']=='premium' and room('w-102')['adult_capacity']==4
+    assert next(r for r in client.get('/api/inventory').json()['rooms'] if r['id']=='w-102')['adult_capacity']==4
+    people=family(client,owner,[member(f'Synthetic adult {i}') for i in range(4)])
+    assign(client,owner,people,'w-102')
+    current=revision(client)
+    rejected=client.put('/api/planning/rooms/w-102/category',json={'revision':current,'category':'superior'},headers=headers(owner))
+    assert rejected.status_code==409 and 'capacity' in rejected.text
+    assert revision(client)==current and room('w-102')['adult_capacity']==4
+    assert client.put('/api/planning/rooms/w-102/category',json={'revision':current-1,'category':'superior'},headers=headers(owner)).status_code==409
+    assert client.put('/api/planning/rooms/second-0-1/category',json={'revision':current,'category':'premium'},headers=headers(owner)).status_code==400
+    assert client.put('/api/planning/rooms/w-102/category',json={'revision':current,'category':'premium'},headers=headers(owner)).status_code==400
+
+
+def test_room_downgrade_keeps_four_premium_reserve_and_named_reservation(client,owner):
+    first=client.put('/api/planning/rooms/w-103/category',json={'revision':revision(client),'category':'superior'},headers=headers(owner))
+    assert first.status_code==200,first.text
+    data=plan(client)
+    assert sum(r['category']=='premium' and r['hotel_id']=='wyndham' for r in data['resources'])==23
+    assert next(r for r in data['resources'] if r['id']=='w-103')['adult_capacity']==3
+    premium=[r for r in data['resources'] if r['hotel_id']=='wyndham' and r['category']=='premium']
+    data['families']=[];data['guests']=[]
+    for i in range(20):
+        fid=f'synthetic-family-{i}';gid=f'synthetic-person-{i}'
+        data['families'].append({'id':fid,'label':fid,'side':'bride','reserved_eligible':False,'couple_children':False})
+        data['guests'].append({'id':gid,'family_id':fid,'name':None,'age':30,'age_band':'adult','side':'bride','reserved_eligible':False,'couple_children':False,'category':'guest','arrival':NIGHTS[0],'tags':[]})
+    rows=[{'guest_id':g['id'],'night':NIGHTS[0],'resource_id':premium[i]['id']} for i,g in enumerate(data['guests'])]
+    assert any(e['code']=='reserve_pool' for e in validate(data,rows)['errors'])
+    proposal=allocate(data)
+    premium_ids={r['id'] for r in premium}
+    assert proposal['assignments'] is not None and len({a['resource_id'] for a in proposal['assignments'] if a['resource_id'] in premium_ids})<=19
+    reserve(client,owner,['w-101','w-201','w-203','w-105'])
+    rejected=client.put('/api/planning/rooms/w-101/category',json={'revision':revision(client),'category':'superior'},headers=headers(owner))
+    assert rejected.status_code==409 and 'family reservation' in rejected.text
+
+
+def test_room_number_change_keeps_assignment_identity_and_rejects_duplicates(client,owner):
+    people=family(client,owner,[member()])
+    assign(client,owner,people,'w-102')
+    old=revision(client)
+    renamed=client.put('/api/planning/rooms/w-102/number',json={'revision':old,'number':' 102A '},headers=headers(owner))
+    assert renamed.status_code==200,renamed.text
+    data=plan(client)
+    assert next(r for r in data['resources'] if r['id']=='w-102')['number']=='102A'
+    assert next(r for r in client.get('/api/inventory').json()['rooms'] if r['id']=='w-102')['number']=='102A'
+    assert data['assignments']==[{'guest_id':people[0]['id'],'night':NIGHTS[0],'resource_id':'w-102'}]
+    assert data['revision']==old+1
+    for number,status in [('104',409),('',400),('102A',400)]:
+        r=client.put('/api/planning/rooms/w-102/number',json={'revision':data['revision'],'number':number},headers=headers(owner))
+        assert r.status_code==status,r.text
+    assert revision(client)==data['revision']
+    second=client.put('/api/planning/rooms/second-0-1/number',json={'revision':data['revision'],'number':'Annex 1'},headers=headers(owner))
+    assert second.status_code==200,second.text
+    assert next(r for r in plan(client)['resources'] if r['id']=='second-0-1')['number']=='Annex 1'
 
 
 def test_automatic_pool_allocation_applies_and_is_not_reported_stale(client,owner):

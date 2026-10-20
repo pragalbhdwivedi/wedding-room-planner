@@ -100,7 +100,7 @@ def allocate(data,time_limit=10):
         held=[]
         for rid,flags in premium_usage.items():
             used=model.new_bool_var('premium_any_'+rid);model.add_max_equality(used,flags);held.append(used)
-        model.add(sum(held)<=20)
+        model.add(sum(held)<=len(premium_usage)-4)
     for link in data['links']:
         if link['severity']!='hard' or link['kind'] not in {'nearby','same_building'} or link['a'] not in unit_for or link['b'] not in unit_for:continue
         i,j=unit_for[link['a']],unit_for[link['b']]

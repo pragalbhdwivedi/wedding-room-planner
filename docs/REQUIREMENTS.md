@@ -10,6 +10,8 @@ Build a private web-based room-allocation application inside Docker. Support pho
 
 - Wyndham: 44 rooms, consisting of 20 Superior and 24 Premium rooms. Two-person base occupancy.
 - Forty rooms are for general guests. Four Premium rooms are for family and must be blocked from general allocation. The owner will select their room numbers later; do not guess them.
+- The owner can upgrade a Wyndham room from Superior to Premium or downgrade it back in the planner. The chosen type and adult capacity apply to both nights. Reject a change that invalidates a current placement, a named family reservation, or the four-Premium-room reserve. Keep the original workbook inventory as source history; a planner change does not itself confirm a hotel booking change or price.
+- The owner can change a hotel room's displayed number without changing its stable room identity or guest assignments. Reject blank Wyndham numbers and duplicates within the same hotel. Retain the original source number in the inventory reference and audit the old/new displayed value.
 - Extra bedding is included. Superior accommodates three adults/adult-counted occupants; Premium accommodates four, subject to the child-sharing policy below.
 - Supply of extra bedding should not itself be treated as a fixed hotel-wide shortage. Unlimited supply does not authorise arbitrary adult occupancy in a room.
 - Separate hotel: six rooms, three ground-floor and three first-floor, each accommodating up to four adults. Real room numbers and property name are not supplied.

@@ -124,7 +124,8 @@ def validate(snapshot, assignments, *, before=None):
             if not compatible(a,b,links):result.append(issue("compatibility", "Friends share only with the same specified gender and side. Other unrelated guests need explicit sharing compatibility; mandatory exclusions remain enforced.", guests=[a["id"],b["id"]], resources=[rid],night=night))
     if snapshot["reserved_count"]==0:
         premium={a['resource_id'] for a in assignments if a['resource_id'] in resources and resources[a['resource_id']]['hotel_id']=='wyndham' and resources[a['resource_id']]['category']=='premium'}
-        if len(premium)>20:result.append(issue('reserve_pool','Four Premium rooms must stay unused across both nights until named family rooms are chosen.',resources=premium))
+        premium_count=sum(r['hotel_id']=='wyndham' and r['category']=='premium' for r in resources.values())
+        if len(premium)>premium_count-4:result.append(issue('reserve_pool','Four Premium rooms must stay unused across both nights until named family rooms are chosen.',resources=premium))
     rosters=friend_rosters(snapshot)
     for night in NIGHTS:
         for family in snapshot["families"]:

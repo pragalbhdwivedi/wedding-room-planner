@@ -1490,3 +1490,15 @@
   padding-left: 14px;
   margin: 14px 0;
 }
+
+.room-number-action {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.room-number-action label {
+  flex: 1 1 160px;
+  min-width: 0;
+}

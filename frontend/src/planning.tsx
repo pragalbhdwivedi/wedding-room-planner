@@ -3207,6 +3207,59 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
             ))}
           {owner && (
             <>
+              {details.hotel_id === "wyndham" && (
+                <div className="room-category-action">
+                  <p className="form-help">
+                    Changing room type updates the adult capacity for both nights.
+                    Existing placements and the four-room Premium reserve must remain valid.
+                    Confirm any actual room change with the hotel separately.
+                  </p>
+                  <button
+                    type="button"
+                    className="secondary compact"
+                    disabled={busy}
+                    onClick={async () => {
+                      const target = details.category === "superior" ? "premium" : "superior";
+                      const result = await action(
+                        "/rooms/" + details.id + "/category",
+                        { revision: data.revision, category: target },
+                        "PUT",
+                      );
+                      if (result) setDetails(null);
+                    }}
+                  >
+                    {details.category === "superior" ? "Upgrade to Premium" : "Downgrade to Superior"}
+                  </button>
+                </div>
+              )}
+              {details.hotel_id !== "staff" && (
+                <form
+                  className="room-number-action"
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const form = new FormData(e.currentTarget);
+                    const result = await action(
+                      "/rooms/" + details.id + "/number",
+                      { revision: data.revision, number: String(form.get("room-number") || "").trim() || null },
+                      "PUT",
+                    );
+                    if (result) setDetails(null);
+                  }}
+                >
+                  <label>
+                    Room number
+                    <input
+                      name="room-number"
+                      maxLength={16}
+                      required={details.hotel_id === "wyndham"}
+                      defaultValue={details.number || ""}
+                    />
+                  </label>
+                  <button type="submit" className="secondary compact" disabled={busy}>
+                    Change room number
+                  </button>
+                </form>
+              )}
               <div className="dialog-actions">
                 <button
                   type="button"
@@ -3278,7 +3331,6 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                     "/rooms/" + details.id,
                     {
                       revision: data.revision,
-                      number: form.get("number") || null,
                       near_restaurant: form.get("restaurant") === "on",
                     },
                     "PUT",
@@ -3286,16 +3338,6 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                   if (r) setDetails(null);
                 }}
               >
-                {details.hotel_id === "second" && (
-                  <label>
-                    Confirmed room number
-                    <input
-                      name="number"
-                      maxLength={16}
-                      defaultValue={details.number || ""}
-                    />
-                  </label>
-                )}
                 <label className="checkbox-label">
                   <input
                     name="restaurant"

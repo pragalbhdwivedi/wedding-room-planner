@@ -114,9 +114,35 @@ function App() {
         setCsrf("");
         setInventory(null);
       }
-      throw new Error(body.detail || "Something went wrong. Please try again.");
+      const detail = body.detail;
+      throw new Error(
+        typeof detail === "string"
+          ? detail
+          : detail?.errors?.map((item: { message: string }) => item.message).join(" ") ||
+              detail?.message ||
+              "Something went wrong. Please try again.",
+      );
     }
     return body;
+  }
+  async function updateSelectedRoom(kind: "category" | "number", value: string | null) {
+    if (!selected || !owner) return;
+    setBusy(true);
+    setError("");
+    try {
+      const current = await api("/planning");
+      await api("/planning/rooms/" + selected.id + "/" + kind, {
+        method: "PUT",
+        body: JSON.stringify({ revision: current.revision, [kind]: value }),
+      });
+      const next = await api("/inventory");
+      setInventory(next);
+      setSelected(next.rooms.find((r: Room) => r.id === selected.id) || null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
   }
   useEffect(() => {
     Promise.all([
@@ -138,12 +164,12 @@ function App() {
       .finally(() => setLoading(false));
   }, []);
   useEffect(() => {
-    if (user) {
+    if (user && page === "rooms") {
       api("/inventory")
         .then(setInventory)
         .catch((e) => setError(e.message));
     }
-  }, [user?.id]);
+  }, [user?.id, page]);
   useEffect(() => {
     if (user?.role === "owner" && page === "users") loadAccounts();
   }, [page, user?.id]);
@@ -616,7 +642,7 @@ function App() {
                   icon={<BedDouble />}
                   value="44"
                   label="Wyndham rooms"
-                  note="20 Superior · 24 Premium"
+                  note={`${inventory?.rooms.filter((r) => r.hotel_id === "wyndham" && r.category === "superior").length ?? 20} Superior · ${inventory?.rooms.filter((r) => r.hotel_id === "wyndham" && r.category === "premium").length ?? 24} Premium`}
                 />
                 <Stat
                   icon={<LockKeyhole />}
@@ -1056,6 +1082,47 @@ function App() {
                     not establish a total physical headcount limit. Guest
                     allocation is not available in this stage.
                   </p>
+                  {owner && selected.hotel_id === "wyndham" && (
+                    <>
+                      <p className="subtle">
+                        A room-type change applies to both nights. It will be
+                        refused if a placement or the four-room Premium reserve
+                        would become invalid. Confirm the actual change with the hotel separately.
+                      </p>
+                      <button
+                        className="secondary compact"
+                        disabled={busy}
+                        onClick={() => updateSelectedRoom("category", selected.category === "superior" ? "premium" : "superior")}
+                      >
+                        {selected.category === "superior" ? "Upgrade to Premium" : "Downgrade to Superior"}
+                      </button>
+                    </>
+                  )}
+                  {owner && (
+                    <form
+                      className="room-number-action"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const form = new FormData(e.currentTarget);
+                        updateSelectedRoom("number", String(form.get("room-number") || "").trim() || null);
+                      }}
+                    >
+                      <label>
+                        Room number
+                        <input
+                          key={selected.id + ":" + (selected.number || "")}
+                          name="room-number"
+                          maxLength={16}
+                          required={selected.hotel_id === "wyndham"}
+                          defaultValue={selected.number || ""}
+                        />
+                      </label>
+                      <button className="secondary compact" disabled={busy}>
+                        Change room number
+                      </button>
+                    </form>
+                  )}
+                  {error && <p className="alert error" role="alert">{error}</p>}
                 </>
               )
             )}

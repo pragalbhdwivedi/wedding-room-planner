@@ -51,6 +51,8 @@ Status: acceptance plan; actual results are recorded separately in STATUS.md. Us
 | A39 | Initial room view | All 44 Wyndham cards visible by scrolling, count shown; topology and filters available on laptop/phone. |
 | A40 | Invitation family directory and function times | No duplicate accommodation guests, owner-only writes, family-side scope, source links, midnight date preserved, scoped Excel function details. |
 | A41 | HTTPS reverse-proxy sign-in | Public HTTP redirects to the HTTPS sign-in page without a loop; the exact HTTPS origin reaches sign-in validation, a foreign origin remains rejected, a valid sign-in receives a Secure session cookie, and authenticated owner/viewer access retains its existing scopes. Check on the owner's device; a health check alone does not satisfy this. |
+| A42 | Room upgrade/downgrade | Owner can switch a Wyndham room between Superior (three adult-counted occupants) and Premium (four) from room details, and both room views and allocation use the new type. A current four-person placement, a named Premium family reservation, or the unnamed four-room reserve blocks an unsafe downgrade. A viewer cannot change it; revision and audit update only on success. |
+| A43 | Change room number | Owner can rename a Wyndham or second-hotel room from either room view; assignments and stable room ID remain intact. A duplicate number within the hotel is refused without a revision change; family/reception viewers cannot rename rooms. |
 
 ## Owner acceptance
 

@@ -35,7 +35,7 @@ Only the owner's application login may change planning data or settings. Family 
 
 ## Inventory and policies
 
-- Wyndham: 44 rooms; 40 general guest rooms and four Premium rooms reserved for family.
+- Wyndham: 44 rooms; 40 general guest rooms and four Premium rooms reserved for family. The initial workbook split is 20 Superior / 24 Premium; the owner can plan individual room upgrades or downgrades.
 - Separate hotel: six rooms, each accommodating up to four adults.
 - Separate staff dormitory: 12 free beds; mandatory separation from guest accommodation.
 - Wyndham package: 120 + 8 complimentary guests per night, including family-room occupants.
