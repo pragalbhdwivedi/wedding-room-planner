@@ -142,6 +142,8 @@ def update_family(family_id:uuid.UUID,body:FamilyInput,user:Editor,db:DB):
     state=locked_state(db,body.revision);before=snapshot(db)
     if not db.get(Family,family_id):raise HTTPException(404,"Family/group not found")
     draft=body.model_dump(mode='json');existing={g['id']:g for g in before['guests']}
+    if 'required_room_type' not in body.model_fields_set:
+        draft['required_room_type']=next(f['required_room_type'] for f in before['families'] if f['id']==str(family_id))
     for source,member in zip(body.members,draft['members']):
         old=existing.get(str(source.id))
         if old:
