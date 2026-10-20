@@ -51,6 +51,7 @@ type Family = {
   side: "bride" | "groom";
   reserved_eligible: boolean;
   couple_children: boolean;
+  required_room_type: "superior" | "premium" | null;
 };
 type Guest = {
   id: string;
@@ -821,6 +822,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
       side: f?.side || "bride",
       reserved_eligible: f?.reserved_eligible || false,
       couple_children: f?.couple_children || false,
+      required_room_type: f?.required_room_type || null,
       members: f
         ? data.guests
             .filter((g) => g.family_id === f.id)
@@ -845,6 +847,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
       side: d.side,
       reserved_eligible: d.reserved_eligible,
       couple_children: d.couple_children,
+      required_room_type: d.required_room_type,
       members: d.members.map((g: any) => ({
         ...(g.id ? { id: g.id } : {}),
         name: g.name || null,
@@ -1542,6 +1545,9 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                   {f.reserved_eligible && <span>Family-room eligible</span>}
                   {f.couple_children && (
                     <span>Couple with children · Superior at Wyndham</span>
+                  )}
+                  {f.required_room_type && (
+                    <span>{f.required_room_type === "superior" ? "Superior" : "Premium"} room required</span>
                   )}
                 </div>
                 <div className="guest-table-wrap">
@@ -2712,12 +2718,33 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                     setFamilyDraft({
                       ...familyDraft,
                       couple_children: e.target.checked,
+                      required_room_type: e.target.checked ? "superior" : familyDraft.required_room_type,
                     })
                   }
                 />
                 Couple with children · Superior at Wyndham
               </label>
             </div>
+            <fieldset className="family-room-type">
+              <legend>Room type for this family</legend>
+              <div className="family-options">
+                {(["superior", "premium"] as const).map((type) => (
+                  <label className="checkbox-label" key={type}>
+                    <input
+                      type="checkbox"
+                      checked={familyDraft.required_room_type === type}
+                      disabled={type === "premium" && familyDraft.couple_children}
+                      onChange={(e) => setFamilyDraft({
+                        ...familyDraft,
+                        required_room_type: e.target.checked ? type : null,
+                      })}
+                    />
+                    {type === "superior" ? "Superior" : "Premium"}
+                  </label>
+                ))}
+              </div>
+              <p className="form-help">Tick one type to require it for placement at Wyndham. Leave both unticked to use any eligible room.</p>
+            </fieldset>
             <p className="form-help">
               {familyDraft.members.length} guest slots. Blank names are allowed;
               enter exact ages or an adult/child band for provisional placement.

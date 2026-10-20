@@ -193,6 +193,50 @@ def test_reservations_capacity_children_bedding_and_ground_floor(client,owner):
     assert any(e['code']=='age_unknown' for e in preview(client,owner,unknown,'w-112')['errors'])
 
 
+def test_family_room_type_selection_controls_moves_allocation_and_edit_review(client,owner):
+    people=family(client,owner,[member('Synthetic Premium Guest',32)],required_room_type='premium')
+    assert plan(client)['families'][0]['required_room_type']=='premium'
+    assert any(e['code']=='family_room_type' for e in preview(client,owner,people,'w-102')['errors'])
+    assert not preview(client,owner,people,'w-105')['errors']
+    proposal=allocate(snapshot_for_test(client))
+    assert proposal['assignments']
+    chosen=[a for a in proposal['assignments'] if a['guest_id']==people[0]['id']]
+    assert chosen and all(next(r for r in plan(client)['resources'] if r['id']==a['resource_id'])['category']=='premium' for a in chosen)
+    for night in NIGHTS:assign(client,owner,people,'w-105',night)
+    body={'revision':revision(client),'label':'Synthetic Family','side':'bride','required_room_type':'superior','members':[{**member('Synthetic Premium Guest',32),'id':people[0]['id']}]}
+    response=client.put('/api/planning/families/'+people[0]['family_id'],json=body,headers=headers(owner))
+    assert response.status_code==200,response.text
+    review=response.json();assert review['family_edit'] and review['changes']
+    assert plan(client)['families'][0]['required_room_type']=='premium'
+    applied=client.post('/api/planning/families/apply',json={'revision':review['revision'],'token':review['token'],'acknowledged':[w['id'] for w in review['warnings']]},headers=headers(owner))
+    assert applied.status_code==200,applied.text
+    current=plan(client)
+    assert current['families'][0]['required_room_type']=='superior'
+    assert all(next(r for r in current['resources'] if r['id']==a['resource_id'])['category']=='superior' for a in current['assignments'])
+    book=load_workbook(io.BytesIO(client.get('/api/planning/export.xlsx').content))
+    columns=[cell.value for cell in book['Guests'][1]]
+    assert next(row[columns.index('Family room type')] for row in list(book['Guests'].values)[1:])=='superior'
+    book['Guests'].delete_cols(columns.index('Family room type')+1)
+    old_template=io.BytesIO();book.save(old_template)
+    imported=client.post('/api/planning/import/preview?revision='+str(revision(client)),files={'file':('old-template.xlsx',old_template.getvalue(),'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')},headers=headers(owner))
+    assert imported.status_code==200 and not imported.json()['errors'],imported.text
+    review=imported.json()
+    assert client.post('/api/planning/import/apply',json={'revision':review['revision'],'token':review['token'],'acknowledged':[w['id'] for w in review['warnings']]},headers=headers(owner)).status_code==200
+    assert plan(client)['families'][0]['required_room_type']=='superior'
+
+
+def snapshot_for_test(client):
+    with SessionLocal() as db:return snapshot(db)
+
+
+def test_family_room_type_rejects_conflicting_couple_or_staff(client,owner):
+    for fields in [{'couple_children':True,'required_room_type':'premium'}, {'required_room_type':'superior'}]:
+        members=[member('Synthetic Driver',35,category='driver')] if not fields.get('couple_children') else [member('Synthetic Parents',35)]
+        response=client.post('/api/planning/families',json={'revision':revision(client),'label':'Synthetic Family','side':'bride','members':members,**fields},headers=headers(owner))
+        assert response.status_code==422,response.text
+    assert plan(client)['families']==[]
+
+
 def test_dormitory_second_hotel_dates_and_reserved_eligibility(client,owner):
     reserve(client,owner)
     guest=family(client,owner,[member('Synthetic Regular',30)],label='Regular')

@@ -18,7 +18,7 @@ from .planning_rules import issue, validate
 from .planning_store import hard_check, locked_state, snapshot, visible_plan
 
 router=APIRouter(prefix="/api/planning")
-HEADERS=['Guest ID','Family ID','Group','Side','Reserved eligible','Couple with children','Name','Age','Category','Phone','Arrival','Tags','Private notes','Age band','Gender','Sharing mode']
+HEADERS=['Guest ID','Family ID','Group','Side','Reserved eligible','Couple with children','Name','Age','Category','Phone','Arrival','Tags','Private notes','Age band','Gender','Sharing mode','Family room type']
 
 
 def safe(value):
@@ -39,13 +39,13 @@ def export(user:Viewer,db:DB,template:bool=False):
     editor=user.role in {'owner','editor'}
     if template and not editor:raise HTTPException(403,'Only an owner or editor can import guest templates')
     data=visible_plan(db,user);workbook=Workbook();sheet=workbook.active;sheet.title='Guests'
-    headers=HEADERS if editor else [h for h in HEADERS if h not in ['Private notes','Reserved eligible','Couple with children'] and not (h=='Phone' and user.role=='family')]
+    headers=HEADERS if editor else [h for h in HEADERS if h not in ['Private notes','Reserved eligible','Couple with children','Family room type'] and not (h=='Phone' and user.role=='family')]
     sheet.append(headers)
     families={f['id']:f for f in data['families']}
     if not template:
         for g in data['guests']:
             f=families[g['family_id']]
-            row=dict(zip(HEADERS,[g['id'],g['family_id'],f['label'],g['side'],f['reserved_eligible'],f['couple_children'],g['name'],g['age'],g['category'],g.get('phone'),g['arrival'],', '.join(g['tags']),g.get('notes',''),g.get('age_band','unknown'),g.get('gender','unspecified'),g.get('sharing_mode','family')]))
+            row=dict(zip(HEADERS,[g['id'],g['family_id'],f['label'],g['side'],f['reserved_eligible'],f['couple_children'],g['name'],g['age'],g['category'],g.get('phone'),g['arrival'],', '.join(g['tags']),g.get('notes',''),g.get('age_band','unknown'),g.get('gender','unspecified'),g.get('sharing_mode','family'),f.get('required_room_type')]))
             sheet.append([safe(row[h]) for h in headers])
         assigned=workbook.create_sheet('Assignments');assigned.append(['Guest ID','Night','Room or bed ID','Separate bed for child'])
         for a in data['assignments']:assigned.append([a['guest_id'],a['night'],a['resource_id'],a.get('separate_bed',False)])
@@ -65,7 +65,7 @@ def export(user:Viewer,db:DB,template:bool=False):
             cost.append(['','Known subtotal','','',bill['known_subtotal_paise'],'Estimate; unpriced items listed below'])
             for item in bill['unpriced']:cost.append([item.get('day'),safe(item['reason']),item.get('quantity'),None,None,'UNPRICED'])
     instructions=workbook.create_sheet('Read me');instructions.append(['Instructions'])
-    for text in ['One row is one guest slot. Completing a name does not add a second person.','Preserve Guest ID and Family ID on re-import. Blank IDs create new records, with duplicate warnings.','New groups require Group and Side (bride or groom). Ages may be blank. Supply Age band adult/child for provisional assignment, or unknown to leave unresolved.','Arrival is 2026-11-24, 2026-11-25 or blank for a non-resident. Category: guest, driver, staff, vendor.','Built-in tags: ground_floor, second_hotel, near_restaurant. Additional tags use short text.','Use the owner import preview before applying. Import does not delete records or assign rooms.','Private notes and costs are omitted from viewer exports. Formula-like user text is exported as text.']:
+    for text in ['One row is one guest slot. Completing a name does not add a second person.','Preserve Guest ID and Family ID on re-import. Blank IDs create new records, with duplicate warnings.','New groups require Group and Side (bride or groom). Ages may be blank. Supply Age band adult/child for provisional assignment, or unknown to leave unresolved.','Arrival is 2026-11-24, 2026-11-25 or blank for a non-resident. Category: guest, driver, staff, vendor.','Family room type: superior, premium or blank. The choice requires that Wyndham room type; couples with children use Superior.','Built-in tags: ground_floor, second_hotel, near_restaurant. Additional tags use short text.','Use the owner import preview before applying. Import does not delete records or assign rooms.','Private notes and costs are omitted from viewer exports. Formula-like user text is exported as text.']:
         instructions.append([text])
     for s in workbook:decorate(s)
     output=io.BytesIO();workbook.save(output)
@@ -116,7 +116,10 @@ def parse_import(content,current):
             elif old:fid=old['family_id']
             else:fid=new_groups.setdefault((label.casefold(),side),str(uuid.uuid4()))
             if old and old['family_id']!=fid:raise ValueError('Guest ID belongs to a different family')
-            family={'id':fid,'label':label,'side':side,'reserved_eligible':boolean(row.get('Reserved eligible')),'couple_children':boolean(row.get('Couple with children'))}
+            room_type=(str(row.get('Family room type') or '').strip().lower() or None) if 'Family room type' in headers else known_families.get(fid,{}).get('required_room_type')
+            if room_type not in {None,'superior','premium'}:raise ValueError('Family room type must be Superior, Premium or blank')
+            family={'id':fid,'label':label,'side':side,'reserved_eligible':boolean(row.get('Reserved eligible')),'couple_children':boolean(row.get('Couple with children')),'required_room_type':room_type}
+            if family['couple_children'] and room_type=='premium':raise ValueError('Couples with children require Superior rooms')
             if fid in families and families[fid]!=family:raise ValueError('Repeated family rows have inconsistent details')
             families[fid]=family
             arrival=row.get('Arrival')
@@ -132,7 +135,8 @@ def parse_import(content,current):
             friend_hint=category=='friends' or bool(set(tags)&{'friends','role_friend'})
             sharing_mode=str(row.get('Sharing mode') or ('friends' if friend_hint else (old or {}).get('sharing_mode','family'))).strip().lower()
             value=GuestInput(name=name,gender=str(row.get('Gender') or (old or {}).get('gender','unspecified')).strip().lower(),sharing_mode=sharing_mode,age_band=str(row.get('Age band') or (old or {}).get('age_band','unknown')).strip().lower(),age=None if age in [None,''] else int(float(age)),category='guest' if category=='friends' else category,phone=str(row['Phone']) if row.get('Phone') is not None else None,arrival=arrival,tags=tags,notes=str(row.get('Private notes') or ''))
-            guest={**value.model_dump(mode='json',exclude={'id'}),'id':gid,'family_id':fid,'side':side,'reserved_eligible':family['reserved_eligible'],'couple_children':family['couple_children']}
+            if room_type and value.category!='guest':raise ValueError('Room types apply only to hotel guests')
+            guest={**value.model_dump(mode='json',exclude={'id'}),'id':gid,'family_id':fid,'side':side,'reserved_eligible':family['reserved_eligible'],'couple_children':family['couple_children'],'required_room_type':room_type}
             if guest['name'] and guest['name'].casefold() in names and not old:warnings.append(issue('import_duplicate_name_'+str(row_index),'A new row has a name already present. Review duplicates before adding another slot.',severity='warning',guests=[gid]))
             if guest['name']:names.add(guest['name'].casefold())
             guests[gid]=guest
@@ -142,7 +146,7 @@ def parse_import(content,current):
     fmap={f['id']:f for f in merged['families']}
     for g in merged['guests']:
         f=fmap[g['family_id']]
-        for key in ['side','reserved_eligible','couple_children']:g[key]=f[key]
+        for key in ['side','reserved_eligible','couple_children','required_room_type']:g[key]=f[key]
     if len(merged['guests'])>1000:errors.append({'row':None,'message':'The event supports at most 1,000 guest slots.'})
     checked=validate(merged,current['assignments']);errors.extend({'row':None,'message':i['message']} for i in checked['errors'])
     old_warnings={w['id'] for w in validate(current,current['assignments'])['warnings']}
@@ -172,7 +176,7 @@ def apply_import(body:ApplyInput,user:Editor,db:DB):
     for f in pending.payload['families']:
         row=db.get(Family,uuid.UUID(f['id']))
         if not row:row=Family(id=uuid.UUID(f['id']));db.add(row)
-        for k in ['label','side','reserved_eligible','couple_children']:setattr(row,k,f[k])
+        for k in ['label','side','reserved_eligible','couple_children','required_room_type']:setattr(row,k,f[k])
     db.flush()
     for g in pending.payload['guests']:
         row=db.get(Guest,uuid.UUID(g['id']))

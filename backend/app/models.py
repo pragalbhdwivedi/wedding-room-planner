@@ -116,6 +116,7 @@ class Family(Base):
     side: Mapped[str] = mapped_column(String(8))
     reserved_eligible: Mapped[bool] = mapped_column(Boolean, default=False)
     couple_children: Mapped[bool] = mapped_column(Boolean, default=False)
+    required_room_type: Mapped[str | None] = mapped_column(String(8), nullable=True)
 
 
 class Guest(Base):
