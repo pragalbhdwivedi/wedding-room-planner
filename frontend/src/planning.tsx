@@ -418,8 +418,10 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
     [swapFrom, setSwapFrom] = useState<Resource | null>(null);
   const [details, setDetails] = useState<Resource | null>(null),
     [relocation, setRelocation] = useState<Resource | null>(null),
+    [relocationCategory, setRelocationCategory] = useState("all"),
     [relocationTarget, setRelocationTarget] = useState(""),
     [relocationBothNights, setRelocationBothNights] = useState(false),
+    [confirmClearLayout, setConfirmClearLayout] = useState(false),
     [pickerRoom, setPickerRoom] = useState<Resource | null>(null),
     [pickerSelection, setPickerSelection] = useState<string[]>([]),
     [pickerSearch, setPickerSearch] = useState(""),
@@ -429,6 +431,8 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
     [acks, setAcks] = useState<string[]>([]);
   const [nodes, setNodes] = useState<Node[]>([]),
     [flow, setFlow] = useState<ReactFlowInstance | null>(null),
+    [layoutDirty, setLayoutDirty] = useState(false),
+    [layoutBaseRevision, setLayoutBaseRevision] = useState<number | null>(null),
     [jobs, setJobs] = useState<any[]>([]),
     [bill, setBill] = useState<any>(null),
     [basis, setBasis] = useState("planned"),
@@ -478,6 +482,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
   }
   const upload = useRef<HTMLInputElement>(null),
     revisionRef = useRef(0);
+  const layoutDraft = useRef<Record<string, { x: number; y: number }>>({});
   const pointerDrag = useRef<{
       ids: string[];
       x: number;
@@ -684,6 +689,13 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
     setPickerSearch("");
     setPickerRoom(r);
   }
+  function beginRelocation(r: Resource, category = "all") {
+    setRelocation(r);
+    setRelocationCategory(category);
+    setRelocationTarget("");
+    setRelocationBothNights(false);
+    setDetails(null);
+  }
   async function chooseRoom(r: Resource) {
     if (Date.now() - dragFinished.current < 250) return;
     if (layoutMode) {
@@ -733,13 +745,56 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
       ) || [],
     [data?.resources, hotel, block, floor],
   );
+  function startLayout() {
+    if (!data) return;
+    layoutDraft.current = {};
+    setLayoutDirty(false);
+    setLayoutBaseRevision(data.revision);
+    setRoomView("topology");
+    setLayoutMode(true);
+    setSelection([]);
+  }
+  function cancelLayout() {
+    layoutDraft.current = {};
+    setLayoutDirty(false);
+    setLayoutBaseRevision(null);
+    setLayoutMode(false);
+  }
+  function clearLayout() {
+    if (!data) return;
+    const rooms = data.resources.filter((r) => r.hotel_id === hotel).sort((a, b) =>
+      (a.block ?? 0) - (b.block ?? 0) || (a.floor ?? 0) - (b.floor ?? 0) ||
+      Number(a.number || 0) - Number(b.number || 0) || a.id.localeCompare(b.id));
+    const columns = Math.min(6, Math.max(1, Math.ceil(Math.sqrt(rooms.length))));
+    const positions = Object.fromEntries(rooms.map((r, index) => [r.id, {
+      x: (index % columns) * 270,
+      y: Math.floor(index / columns) * 270,
+    }]));
+    layoutDraft.current = { ...layoutDraft.current, ...positions };
+    setNodes((current) => current.map((node) => ({ ...node,
+      position: positions[node.id] || node.position,
+    })));
+    setLayoutDirty(true);
+    setConfirmClearLayout(false);
+  }
+  async function saveLayout() {
+    if (!layoutDirty || layoutBaseRevision === null) return;
+    const positions = Object.entries(layoutDraft.current).map(([resource_id, position]) => ({ resource_id, ...position }));
+    const saved = await action("/layout", { revision: layoutBaseRevision, positions }, "PUT");
+    if (!saved) return;
+    layoutDraft.current = {};
+    setLayoutDirty(false);
+    setLayoutBaseRevision(null);
+    setLayoutMode(false);
+    setNotice(`${positions.length} room positions saved.`);
+  }
   useEffect(() => {
     if (!data) return;
     setNodes(
       resourceList.map((r) => ({
         id: r.id,
         type: "room",
-        position: { x: r.x, y: r.y },
+        position: layoutMode ? (layoutDraft.current[r.id] || { x: r.x, y: r.y }) : { x: r.x, y: r.y },
         draggable: layoutMode && owner,
         data: {
           resource: r,
@@ -977,13 +1032,13 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
       <div className="planning-loading">{error || "Opening your plan…"}</div>
     );
   const summary = data.summary[night];
-  const relocationType = relocation?.category === "superior" ? "premium" : "superior";
   const relocationNights = relocationBothNights ? nights : [night];
   const relocationAssignments = relocation
     ? data.assignments.filter((a) => a.resource_id === relocation.id && relocationNights.includes(a.night))
     : [];
   const relocationRooms = data.resources
-    .filter((r) => r.hotel_id === "wyndham" && r.category === relocationType)
+    .filter((r) => r.hotel_id === "wyndham" && r.id !== relocation?.id &&
+      (relocationCategory === "all" || r.category === relocationCategory))
     .sort((a, b) => Number(a.number) - Number(b.number));
   const currentJob = jobs[0];
   const reservePending = owner && data.reserved_count !== 4;
@@ -1752,20 +1807,19 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                 >
                   <Redo2 size={16} />
                 </button>
-                <button
-                  className={
-                    "secondary compact " +
-                    (layoutMode ? "selected-control" : "")
-                  }
-                  onClick={() => {
-                    setRoomView("topology");
-                    setLayoutMode(!layoutMode);
-                    setSelection([]);
-                  }}
-                >
-                  <MapPin size={15} />
-                  {layoutMode ? "Finish layout" : "Edit layout"}
-                </button>
+                {layoutMode ? <>
+                  <button className="secondary compact" disabled={busy} onClick={() => setConfirmClearLayout(true)}>
+                    Clear layout
+                  </button>
+                  <button className="primary compact" disabled={busy || !layoutDirty} onClick={saveLayout}>
+                    <Save size={15} /> Save layout
+                  </button>
+                  <button className="secondary compact" disabled={busy} onClick={cancelLayout}>
+                    Cancel layout
+                  </button>
+                </> : <button className="secondary compact" onClick={startLayout}>
+                  <MapPin size={15} /> Edit layout
+                </button>}
                 <button
                   className="primary compact"
                   disabled={
@@ -1947,7 +2001,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
               <div className="canvas-caption">
                 <b>
                   {layoutMode
-                    ? "Move the room cards to save a schematic layout"
+                    ? layoutDirty ? "Unsaved layout changes · Save layout when ready" : "Move room cards, then save the layout"
                     : roomView === "rooms"
                       ? "All rooms"
                       : "Room topology"}
@@ -1994,22 +2048,15 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                     onNodesChange={(changes) =>
                       setNodes((current) => applyNodeChanges(changes, current))
                     }
-                    onNodeDragStop={async (_, node) => {
-                      if (layoutMode && owner)
-                        await action(
-                          "/layout",
-                          {
-                            revision: data.revision,
-                            positions: [
-                              {
-                                resource_id: node.id,
-                                x: Math.max(0, node.position.x),
-                                y: Math.max(0, node.position.y),
-                              },
-                            ],
-                          },
-                          "PUT",
-                        );
+                    onNodeDragStop={(_, node) => {
+                      if (layoutMode && owner) {
+                        const position = {
+                          x: Math.min(20000, Math.max(0, node.position.x)),
+                          y: Math.min(20000, Math.max(0, node.position.y)),
+                        };
+                        layoutDraft.current = { ...layoutDraft.current, [node.id]: position };
+                        setLayoutDirty(true);
+                      }
                     }}
                     onInit={setFlow}
                     fitView
@@ -3188,6 +3235,19 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
           </button>
         </Dialog>
       )}
+      {confirmClearLayout && (
+        <Dialog title="Clear this layout?" close={() => setConfirmClearLayout(false)}>
+          <p className="form-help">
+            Reset the {hotel === "wyndham" ? "Wyndham" : hotel === "second" ? "second hotel" : "staff dormitory"}
+            room-card positions to a clean grid. Guest assignments, room numbers, room types and confirmed links stay as they are.
+            This reset remains a draft until you choose Save layout.
+          </p>
+          <div className="dialog-actions">
+            <button type="button" className="secondary compact" onClick={() => setConfirmClearLayout(false)}>Keep layout</button>
+            <button type="button" className="primary compact" onClick={clearLayout}>Clear positions</button>
+          </div>
+        </Dialog>
+      )}
       {details && (
         <Dialog title={roomName(details)} close={() => setDetails(null)}>
           <p className="form-help">
@@ -3245,20 +3305,23 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                 <div className="room-category-action">
                   <p className="form-help">
                     Room {details.number} stays {details.category}. Move its
-                    occupants to an actual numbered room for an upgrade or downgrade.
+                    occupants to another numbered room to change their assignment.
                   </p>
                   <button
                     type="button"
                     className="secondary compact"
                     disabled={busy || !data.assignments.some((a) => a.resource_id === details.id)}
-                    onClick={() => {
-                      setRelocation(details);
-                      setRelocationTarget("");
-                      setRelocationBothNights(false);
-                      setDetails(null);
-                    }}
+                    onClick={() => beginRelocation(details)}
                   >
-                    {details.category === "superior" ? "Move stay to a Premium room" : "Move stay to a Superior room"}
+                    Change assigned room
+                  </button>{" "}
+                  <button
+                    type="button"
+                    className="secondary compact"
+                    disabled={busy || !data.assignments.some((a) => a.resource_id === details.id)}
+                    onClick={() => beginRelocation(details, details.category === "superior" ? "premium" : "superior")}
+                  >
+                    {details.category === "superior" ? "Upgrade to Premium room" : "Downgrade to Superior room"}
                   </button>
                 </div>
               )}
@@ -3385,9 +3448,9 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
         </Dialog>
       )}
       {relocation && owner && (
-        <Dialog title={`Move stay from room ${relocation.number}`} close={() => setRelocation(null)}>
+        <Dialog title={`Change assigned room from ${relocation.number}`} close={() => setRelocation(null)}>
           <p className="form-help">
-            Choose a numbered {relocationType === "premium" ? "Premium" : "Superior"} room.
+            Choose another numbered Wyndham room.
             Room {relocation.number} keeps its hotel-listed number and {relocation.category} type.
             The placement review checks capacity, reservations, locks and sharing before anything changes.
           </p>
@@ -3412,11 +3475,22 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
               {relocationBothNights ? " across 24 and 25 Nov" : ` for ${dayName(night)}`}.
             </p>
             <label>
+              Room type
+              <select value={relocationCategory} onChange={(e) => {
+                setRelocationCategory(e.target.value);
+                setRelocationTarget("");
+              }}>
+                <option value="all">Superior or Premium</option>
+                <option value="superior">Superior</option>
+                <option value="premium">Premium</option>
+              </select>
+            </label>
+            <label>
               Destination room
               <select required value={relocationTarget} onChange={(e) => setRelocationTarget(e.target.value)}>
-                <option value="">Choose a {relocationType} room</option>
+                <option value="">Choose a numbered room</option>
                 {relocationRooms.map((r) => <option key={r.id} value={r.id}>
-                  {roomName(r)} · Block {r.block} · {r.floor === 0 ? "Ground" : "First"} floor
+                  {roomName(r)} · {r.category} · Block {r.block} · {r.floor === 0 ? "Ground" : "First"} floor
                 </option>)}
               </select>
             </label>

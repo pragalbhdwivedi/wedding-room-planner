@@ -43,6 +43,40 @@ function ThemeToggle({ theme, onToggle }: { theme: Theme; onToggle: () => void }
   );
 }
 
+function AppVersionNotice() {
+  const [newVersion, setNewVersion] = useState(false);
+  useEffect(() => {
+    const current = document.querySelector<HTMLScriptElement>('script[type="module"][src]')?.getAttribute("src");
+    if (!current?.startsWith("/assets/")) return;
+    let active = true;
+    const check = async () => {
+      try {
+        const response = await fetch("/", { cache: "no-store", credentials: "same-origin" });
+        if (!response.ok) return;
+        const page = new DOMParser().parseFromString(await response.text(), "text/html");
+        const latest = page.querySelector<HTMLScriptElement>('script[type="module"][src]')?.getAttribute("src");
+        if (active && latest?.startsWith("/assets/") && latest !== current) setNewVersion(true);
+      } catch { /* A temporary network failure should not interrupt planning. */ }
+    };
+    const whenVisible = () => { if (document.visibilityState === "visible") void check(); };
+    const timer = window.setInterval(() => void check(), 30000);
+    window.addEventListener("focus", check);
+    document.addEventListener("visibilitychange", whenVisible);
+    void check();
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", check);
+      document.removeEventListener("visibilitychange", whenVisible);
+    };
+  }, []);
+  if (!newVersion) return null;
+  return <div className="app-update-banner" role="alert">
+    <span>A planner update is ready. Save any edits, then load the new room controls.</span>
+    <button type="button" onClick={() => window.location.reload()}>Load update</button>
+  </div>;
+}
+
 type User = {
   id: string;
   username: string;
@@ -1263,6 +1297,7 @@ function Stat({
 }
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
+    <AppVersionNotice />
     <App />
   </React.StrictMode>,
 );

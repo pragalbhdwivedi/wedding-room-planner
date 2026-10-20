@@ -3,6 +3,8 @@
     admin off
 }
 :8080 {
+    @page path / /index.html
+    header @page Cache-Control "no-store, must-revalidate"
     header {
         X-Content-Type-Options nosniff
         Referrer-Policy no-referrer

@@ -280,7 +280,7 @@ def room_settings(resource_id:str,body:RoomInput,user:Editor,db:DB):
     resource.near_restaurant=body.near_restaurant
     if resource.room_id and "number" in body.model_fields_set:
         room=db.get(Room,resource.room_id)
-        if room.hotel_id=="wyndham":raise HTTPException(409,"Wyndham room numbers are fixed by the hotel layout. Move guests to another numbered room instead.")
+        if room.hotel_id=="wyndham":raise HTTPException(409,"Wyndham room numbers are fixed by the hotel layout. If this page still shows Change room number, refresh it; then use Change assigned room to move guests.")
         if room.hotel_id=="second":
             number=body.number.strip() if body.number else None
             if number and db.scalar(select(Room.id).where(Room.hotel_id=="second",Room.number==number,Room.id!=room.id)):raise HTTPException(409,"That second-hotel room number is already used.")
@@ -299,7 +299,7 @@ def room_number(resource_id:str,body:RoomNumberInput,user:Editor,db:DB):
     resource=db.get(Resource,resource_id)
     room=db.get(Room,resource.room_id) if resource and resource.room_id else None
     if not room:raise HTTPException(400,"Only hotel rooms have room numbers.")
-    if room.hotel_id=="wyndham":raise HTTPException(409,"Wyndham room numbers are fixed by the hotel layout. Move guests to another numbered room instead.")
+    if room.hotel_id=="wyndham":raise HTTPException(409,"Wyndham room numbers are fixed by the hotel layout. If this page still shows Change room number, refresh it; then use Change assigned room to move guests.")
     number=body.number.strip() if body.number else None
     if room.number==number:raise HTTPException(400,"This room already has that number.")
     if number and db.scalar(select(Room.id).where(Room.hotel_id==room.hotel_id,Room.number==number,Room.id!=room.id)):
@@ -319,7 +319,7 @@ def room_category(resource_id:str,body:RoomCategoryInput,user:Editor,db:DB):
     resource=db.get(Resource,resource_id)
     room=db.get(Room,resource.room_id) if resource and resource.room_id else None
     if not room or room.hotel_id!="wyndham":raise HTTPException(400,"Only Wyndham rooms have a fixed Superior/Premium type.")
-    raise HTTPException(409,"This room's Superior/Premium type is fixed by the hotel layout. Move guests to a numbered room of the requested type instead.")
+    raise HTTPException(409,"This room's Superior/Premium type is fixed by the hotel layout. If this page still shows Upgrade or Downgrade, refresh it; then move guests to a numbered room of the requested type.")
 
 
 class LinkInput(Revision):
