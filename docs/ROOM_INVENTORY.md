@@ -12,7 +12,7 @@ Source: owner-supplied private Wyndham room-layout workbook, both layout and inv
 
 Ground floor: 20 rooms. First floor: 24 rooms. Four Premium rooms must be reserved for family; the numbers are pending owner selection. Consequently, general allocation has 20 Superior and 20 Premium rooms once those four reservations are assigned. Do not silently nominate four rooms.
 
-These are the original workbook categories and numbers. Owner-approved planner changes to a room's displayed number or Superior/Premium type are stored in the private runtime database and audited; they do not rewrite this source inventory. The general Premium count changes with such upgrades/downgrades while four Premium rooms remain reserved for family.
+These are the fixed hotel-listed categories and numbers. The planner must preserve all 44 identities, numbers, categories and corresponding adult capacities. Upgrading or downgrading a stay moves its occupants to another listed room; it never reclassifies or renumbers a physical room. The four Premium family reservations still require owner-selected room numbers.
 
 | Block | Superior ground | Superior first | Premium ground | Premium first |
 | --- | --- | --- | --- | --- |

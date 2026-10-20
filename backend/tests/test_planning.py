@@ -142,7 +142,8 @@ def test_editor_can_manage_accounts_guests_rooms_and_costs(client,owner):
     assert 'Estimate' in load_workbook(io.BytesIO(editor.get('/api/planning/export.xlsx').content)).sheetnames
     people=family(editor,auth,[member('Synthetic editor guest')])
     assign(editor,auth,people,'w-102')
-    changed=editor.put('/api/planning/rooms/w-102/number',json={'revision':revision(editor),'number':'102-editor'},headers=headers(auth))
+    assert editor.put('/api/planning/rooms/w-102/number',json={'revision':revision(editor),'number':'102-editor'},headers=headers(auth)).status_code==409
+    changed=editor.put('/api/planning/rooms/second-0-1/number',json={'revision':revision(editor),'number':'Annex 1'},headers=headers(auth))
     assert changed.status_code==200,changed.text
     added=editor.post('/api/users',json={'username':'synthetic.more','display_name':'Synthetic Viewer','password':PASSWORD,'role':'reception','side':None},headers=headers(auth))
     assert added.status_code==201,added.text
@@ -578,66 +579,63 @@ def test_unnamed_reserve_pool_is_shared_across_nights_and_solver_preserves_four(
     assert sum(r['id'] not in {a['resource_id'] for a in result['assignments']} for r in premium)>=4
 
 
-def test_room_upgrade_downgrade_updates_capacity_without_invalidating_placements(client,owner):
-    room=lambda rid:next(r for r in plan(client)['resources'] if r['id']==rid)
-    before=revision(client)
-    upgraded=client.put('/api/planning/rooms/w-102/category',json={'revision':before,'category':'premium'},headers=headers(owner))
-    assert upgraded.status_code==200,upgraded.text
-    assert room('w-102')['category']=='premium' and room('w-102')['adult_capacity']==4
-    assert next(r for r in client.get('/api/inventory').json()['rooms'] if r['id']=='w-102')['adult_capacity']==4
-    people=family(client,owner,[member(f'Synthetic adult {i}') for i in range(4)])
-    assign(client,owner,people,'w-102')
-    current=revision(client)
-    rejected=client.put('/api/planning/rooms/w-102/category',json={'revision':current,'category':'superior'},headers=headers(owner))
-    assert rejected.status_code==409 and 'capacity' in rejected.text
-    assert revision(client)==current and room('w-102')['adult_capacity']==4
-    assert client.put('/api/planning/rooms/w-102/category',json={'revision':current-1,'category':'superior'},headers=headers(owner)).status_code==409
-    assert client.put('/api/planning/rooms/second-0-1/category',json={'revision':current,'category':'premium'},headers=headers(owner)).status_code==400
-    assert client.put('/api/planning/rooms/w-102/category',json={'revision':current,'category':'premium'},headers=headers(owner)).status_code==400
-
-
-def test_room_downgrade_keeps_four_premium_reserve_and_named_reservation(client,owner):
-    first=client.put('/api/planning/rooms/w-103/category',json={'revision':revision(client),'category':'superior'},headers=headers(owner))
-    assert first.status_code==200,first.text
-    data=plan(client)
-    assert sum(r['category']=='premium' and r['hotel_id']=='wyndham' for r in data['resources'])==23
-    assert next(r for r in data['resources'] if r['id']=='w-103')['adult_capacity']==3
-    premium=[r for r in data['resources'] if r['hotel_id']=='wyndham' and r['category']=='premium']
-    data['resources']=premium
-    data['families']=[];data['guests']=[]
-    for i in range(20):
-        fid=f'synthetic-family-{i}';gid=f'synthetic-person-{i}'
-        data['families'].append({'id':fid,'label':fid,'side':'bride','reserved_eligible':False,'couple_children':False})
-        data['guests'].append({'id':gid,'family_id':fid,'name':None,'age':30,'age_band':'adult','side':'bride','reserved_eligible':False,'couple_children':False,'category':'guest','arrival':NIGHTS[0],'tags':[]})
-    rows=[{'guest_id':g['id'],'night':NIGHTS[0],'resource_id':premium[i]['id']} for i,g in enumerate(data['guests'])]
-    assert any(e['code']=='reserve_pool' for e in validate(data,rows)['errors'])
-    proposal=allocate(data)
-    premium_ids={r['id'] for r in premium}
-    assert proposal['assignments'] is not None and len({a['resource_id'] for a in proposal['assignments'] if a['resource_id'] in premium_ids})<=19
-    assert len(proposal['unassigned'])==2
-    reserve(client,owner,['w-101','w-201','w-203','w-105'])
-    rejected=client.put('/api/planning/rooms/w-101/category',json={'revision':revision(client),'category':'superior'},headers=headers(owner))
-    assert rejected.status_code==409 and 'family reservation' in rejected.text
-
-
-def test_room_number_change_keeps_assignment_identity_and_rejects_duplicates(client,owner):
+def test_wyndham_number_and_type_are_fixed_while_stays_can_move(client,owner):
     people=family(client,owner,[member()])
     assign(client,owner,people,'w-102')
-    old=revision(client)
-    renamed=client.put('/api/planning/rooms/w-102/number',json={'revision':old,'number':' 102A '},headers=headers(owner))
-    assert renamed.status_code==200,renamed.text
+    assign(client,owner,people,'w-102',NIGHTS[1])
+    before=revision(client)
+    for route,body in [('/category',{'category':'premium'}),('/number',{'number':'102A'}),('',{'number':'102A','near_restaurant':False})]:
+        rejected=client.put('/api/planning/rooms/w-102'+route,json={'revision':before,**body},headers=headers(owner))
+        assert rejected.status_code==409 and 'fixed by the hotel layout' in rejected.text
+    assert revision(client)==before
+    for sql in ["UPDATE rooms SET number='102A' WHERE id='w-102'", "UPDATE rooms SET category='premium',adult_capacity=4 WHERE id='w-102'"]:
+        with SessionLocal() as db:
+            with pytest.raises(DBAPIError):db.execute(text(sql))
+    proposed=client.post('/api/planning/assignments/preview',json={'revision':revision(client),'moves':[
+        {'guest_id':people[0]['id'],'night':night,'resource_id':'w-103'} for night in NIGHTS]},headers=headers(owner)).json()
+    assert not proposed['errors'] and apply(client,owner,proposed).status_code==200
     data=plan(client)
-    assert next(r for r in data['resources'] if r['id']=='w-102')['number']=='102A'
-    assert next(r for r in client.get('/api/inventory').json()['rooms'] if r['id']=='w-102')['number']=='102A'
-    assert data['assignments']==[{'guest_id':people[0]['id'],'night':NIGHTS[0],'resource_id':'w-102'}]
-    assert data['revision']==old+1
-    for number,status in [('104',409),('',400),('102A',400)]:
-        r=client.put('/api/planning/rooms/w-102/number',json={'revision':data['revision'],'number':number},headers=headers(owner))
-        assert r.status_code==status,r.text
-    assert revision(client)==data['revision']
+    assert data['assignments']==[{'guest_id':people[0]['id'],'night':night,'resource_id':'w-103'} for night in NIGHTS]
+    assert next(r for r in data['resources'] if r['id']=='w-102')['category']=='superior'
+    assert next(r for r in data['resources'] if r['id']=='w-103')['category']=='premium'
+    assert sum(r['category']=='premium' and r['hotel_id']=='wyndham' for r in data['resources'])==24
+
+
+def test_inventory_migration_restores_room_101_without_moving_guests(client,owner):
+    people=family(client,owner,[member()])
+    assign(client,owner,people,'w-101')
+    before=revision(client)
+    env={**os.environ,'PLANNER_DATABASE_USER':'planner_migrate','PLANNER_DATABASE_PASSWORD_FILE':'/run/secrets/db_migration_password'}
+    downgraded=subprocess.run(['alembic','downgrade','0007_family_room_type'],env=env,capture_output=True,text=True,timeout=30)
+    assert downgraded.returncode==0,downgraded.stderr
+    try:
+        with SessionLocal.begin() as db:
+            db.execute(text("UPDATE rooms SET category='superior',adult_capacity=3 WHERE id='w-101'"))
+        upgraded=subprocess.run(['alembic','upgrade','head'],env=env,capture_output=True,text=True,timeout=30)
+        assert upgraded.returncode==0,upgraded.stderr
+        data=plan(client)
+        room=next(r for r in data['resources'] if r['id']=='w-101')
+        assert (room['number'],room['category'],room['adult_capacity'])==('101','premium',4)
+        assert data['assignments']==[{'guest_id':people[0]['id'],'night':NIGHTS[0],'resource_id':'w-101'}]
+        assert data['revision']==before+1
+        with SessionLocal() as db:
+            assert db.scalar(text("SELECT count(*) FROM change_history WHERE action='room.inventory_restored'"))==1
+    finally:
+        with SessionLocal.begin() as db:
+            if db.scalar(text("SELECT version_num FROM alembic_version"))=='0007_family_room_type':
+                db.execute(text("UPDATE rooms SET category='premium',adult_capacity=4 WHERE id='w-101'"))
+        subprocess.run(['alembic','upgrade','head'],env=env,capture_output=True,text=True,timeout=30)
+
+
+def test_second_hotel_room_number_remains_editable(client,owner):
+    data=plan(client)
+    assert client.put('/api/planning/rooms/second-0-1/category',json={'revision':data['revision'],'category':'premium'},headers=headers(owner)).status_code==400
     second=client.put('/api/planning/rooms/second-0-1/number',json={'revision':data['revision'],'number':'Annex 1'},headers=headers(owner))
     assert second.status_code==200,second.text
     assert next(r for r in plan(client)['resources'] if r['id']=='second-0-1')['number']=='Annex 1'
+    old=revision(client)
+    assert client.put('/api/planning/rooms/second-0-2/number',json={'revision':old,'number':'Annex 1'},headers=headers(owner)).status_code==409
+    assert revision(client)==old
 
 
 def test_automatic_pool_allocation_applies_and_is_not_reported_stale(client,owner):
