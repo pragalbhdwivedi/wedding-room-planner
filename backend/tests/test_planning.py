@@ -369,7 +369,7 @@ def test_money_nights_staff_meals_ages_and_unknown_prices():
     assert calculate(data,policy,settings,[],[])['nights'][NIGHTS[0]]['chargeable']==131
     data['assignments'][0]['separate_bed']=True
     counted=calculate(data,policy,settings,[],[])['nights']
-    assert counted[NIGHTS[0]]['chargeable']==132 and counted[NIGHTS[1]]['chargeable']==131
+    assert counted[NIGHTS[0]]['chargeable']==132 and counted[NIGHTS[1]]['chargeable']==129
     data['assignments'][0].pop('separate_bed')
     staff=[{'id':'staff'+str(i),'age':30,'arrival':None,'category':'staff'} for i in range(5)];data['guests']+=staff
     meals=[{'guest_id':g['id'],'day':NIGHTS[0],'meal':meal,'location':'wyndham','planned':True,'actual':None,'inclusion':'chargeable'} for g in staff for meal in ['lunch','dinner']]
