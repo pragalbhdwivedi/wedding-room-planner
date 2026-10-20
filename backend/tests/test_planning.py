@@ -153,7 +153,7 @@ def test_editor_can_manage_accounts_guests_rooms_and_costs(client,owner):
 def test_child_counts_only_with_explicit_bed_for_each_night(client,owner):
     people=family(client,owner,[member('Synthetic Parent A',31),member('Synthetic Parent B',32),member('Synthetic Child',10)],couple_children=True)
     for night in NIGHTS:assign(client,owner,people,'w-102',night)
-    child=people[2]
+    child=next(person for person in people if person['age']==10)
     first=plan(client)
     assert first['summary'][NIGHTS[0]]['hotel_guests']==2 and first['summary'][NIGHTS[0]]['uncounted_children']==1
     assert first['summary'][NIGHTS[0]]['residents']==3 and first['summary'][NIGHTS[0]]['extra_bedding']==0
@@ -171,7 +171,8 @@ def test_child_counts_only_with_explicit_bed_for_each_night(client,owner):
     assert apply(client,owner,moved).status_code==200
     assert not next(a for a in plan(client)['assignments'] if a['guest_id']==child['id'] and a['night']==NIGHTS[0]).get('separate_bed',False)
     assert plan(client)['summary'][NIGHTS[0]]['hotel_guests']==2
-    assert client.put('/api/planning/assignments/'+people[0]['id']+'/bed',json={'revision':revision(client),'night':NIGHTS[0],'separate_bed':True},headers=headers(owner)).status_code==400
+    adult=next(person for person in people if person['age']==31)
+    assert client.put('/api/planning/assignments/'+adult['id']+'/bed',json={'revision':revision(client),'night':NIGHTS[0],'separate_bed':True},headers=headers(owner)).status_code==400
 
 
 def test_reservations_capacity_children_bedding_and_ground_floor(client,owner):
