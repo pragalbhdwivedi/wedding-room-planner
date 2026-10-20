@@ -9,7 +9,7 @@ Status: acceptance plan; actual results are recorded separately in STATUS.md. Us
 | A03 | Family headcount five, names entered later | Five guest slots throughout; named member completion does not increase total to ten. |
 | A03a | Add and delete a family member | Exact age updates the adult/child display; an added member in an assigned family receives a reviewed placement when valid, or a clear unassigned warning. Deleting an existing member requires review, removes their assignments/attendance/links and resets assignment undo/redo. A locked room or deleting the last slot is rejected. |
 | A04 | Ages 10 and 11 | Age 10 receives child treatment; age 11 adult treatment for billing/bedding. Missing exact age with a supplied adult/child band permits a labelled provisional draft; a wholly unknown band remains unresolved. |
-| A05 | Couple plus two children <=10 | Allowed in a Superior room with bedding under owner policy. Actual heads show four; adult-counted occupancy stays separate. Premium allocation raises the applicable family-placement issue. |
+| A05 | Couple plus two children <=10 | Allowed in a Superior room under owner policy. Physical people show four; hotel guest count starts at two and rises only as separate beds are ticked per child/night. Premium allocation raises the applicable family-placement issue. |
 | A06 | Superior with four adult-counted people | Capacity conflict visible; included bedding does not silently remove the adult-counted limit. Larger young-child arrangements outside known policy are flagged unresolved. |
 | A07 | Age 49, age 50, younger guest tagged ground floor | Default age 49 is not automatically forced to ground; age 50 and tagged younger guest require ground. Ground-floor shortage is explained. |
 | A07a | Enter age 50 for a provisionally assigned upstairs guest | Owner sees the exact guest detail and proposed ground-floor room changes; cancelling keeps the form; applying saves both atomically. Locked or unavailable rooms are explained without losing entered details. |
@@ -30,7 +30,7 @@ Status: acceptance plan; actual results are recorded separately in STATUS.md. Us
 | A20 | Owner tabs A and B edit stale data | Stale write rejected with current-state recovery; no silent overwrite. Old solver proposals cannot overwrite newer locks/data. |
 | A21 | Family viewer uses UI/API/event stream/export | Cannot mutate anything or read another side's restricted data. |
 | A22 | Reception directly requests costs/API/export | Cost fields never returned; viewing operational contact/stay details works. |
-| A23 | Viewer invokes import/user/rate/override endpoint | Server rejects it regardless of hidden or altered buttons. Only owner changes access. |
+| A23 | Viewer invokes import/user/rate/override endpoint | Server rejects it regardless of hidden or altered buttons. Only owner/editor accounts change access. |
 | A24 | Import duplicate IDs/names, unknown ages, invalid rows | Preview exposes issues before application; stable-ID re-import does not duplicate people; failures leave current plan intact. |
 | A25 | Export user text beginning with formula syntax | Text safely represented; scoped fields only. |
 | A26 | Phone and laptop interactions | Owner can assign by touch or drag; viewers have clear read-only layout; labels accompany colours. |
@@ -53,6 +53,8 @@ Status: acceptance plan; actual results are recorded separately in STATUS.md. Us
 | A41 | HTTPS reverse-proxy sign-in | Public HTTP redirects to the HTTPS sign-in page without a loop; the exact HTTPS origin reaches sign-in validation, a foreign origin remains rejected, a valid sign-in receives a Secure session cookie, and authenticated owner/viewer access retains its existing scopes. Check on the owner's device; a health check alone does not satisfy this. |
 | A42 | Room upgrade/downgrade | Owner can switch a Wyndham room between Superior (three adult-counted occupants) and Premium (four) from room details, and both room views and allocation use the new type. A current four-person placement, a named Premium family reservation, or the unnamed four-room reserve blocks an unsafe downgrade. A viewer cannot change it; revision and audit update only on success. |
 | A43 | Change room number | Owner can rename a Wyndham or second-hotel room from either room view; assignments and stable room ID remain intact. A duplicate number within the hotel is refused without a revision change; family/reception viewers cannot rename rooms. |
+| A44 | Explicit child bed and guest count | A child aged 10 or under sharing a room without a separate bed remains in people/placement totals but not hotel counted guests, allowance or excess. Tick a separate bed for one night and only that night gains one counted guest and bedding need; untick reverses it. A room move clears the old bed choice. Adult and viewer bed edits are refused. |
+| A45 | Full editor access | A privately promoted editor signs in again after session revocation, sees both sides and billing, can create/edit users and guests, move people and edit rates. Owner remains the sole protected owner; family/reception viewers retain their existing scopes and cannot mutate or see restricted costs. |
 
 ## Owner acceptance
 

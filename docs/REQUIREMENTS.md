@@ -19,7 +19,7 @@ Build a private web-based room-allocation application inside Docker. Support pho
 
 ## R03 - Children, families, and sharing
 
-- Age 10 and below is treated as a child for the owner's billing and bedding planning. Above age 10 counts as an adult. This supersedes the earlier age-12 suggestion.
+- Age 10 and below is treated as a child; above age 10 counts as an adult. A child aged 10 or under counts toward hotel guest totals and the chargeable accommodation headcount only when an owner/editor explicitly assigns a separate bed for that child and night. A child sharing without a separate bed remains visible in the physical people/placement count. This supersedes the earlier age-12 suggestion.
 - Couples with children receive Superior rooms with extra bedding rather than Premium rooms.
 - The owner explicitly allowed two adults and two children aged 10 or below in a Superior room. Keep actual headcount separate from adult-counted occupancy.
 - The maximum permitted number of young children physically occupying a room has not been supplied. Do not generalise the example into unlimited physical occupancy.
@@ -50,10 +50,10 @@ Build a private web-based room-allocation application inside Docker. Support pho
 
 ## R06 - Wyndham allowance and excess charges
 
-- The booked package covers 120 guests plus eight complimentary guests, giving an allowance of 128 per night.
+- The booked package covers 120 guests plus eight complimentary guests, giving an allowance of 128 counted guests per night.
 - Family-room occupants are included in that allowance.
-- Above age 10 is billed as adult; unknown ages must remain unresolved rather than being silently treated as free children.
-- Excess charge applies only to Wyndham residents: max(0, chargeable resident count - 128) x INR 5,000 per night.
+- Above age 10 is counted automatically; a child aged 10 or under counts only with an explicit separate bed on that night. Unknown ages must remain unresolved rather than being silently treated as free children.
+- Excess charge applies only to counted Wyndham hotel guests: max(0, counted guest count - 128) x INR 5,000 per night.
 - INR 5,000 includes food and all taxes. Extra bedding is included.
 - Calculate each night independently. No carryover is assumed; the owner accepted this planning assumption because actual hotel carryover was unknown.
 - Non-resident guests attending Wyndham meals are charged separately per meal. Their meal rates are not supplied.
@@ -83,10 +83,10 @@ The selected date/night must show total rooms, used/free/reserved rooms, bride/g
 
 ## R10 - Access
 
-- Only the owner's application login may edit any planning data, assignments, rooms, tags, rules, rates, imports, locks, overrides, or access settings.
+- The owner and full-access editor accounts may edit planning data, assignments, child beds, rooms, tags, rules, rates, imports, locks, overrides, and access settings. The owner account remains unique and cannot be demoted through user administration.
 - Family accounts are view-only and limited to their own side.
 - Reception accounts are view-only and may receive relevant guest/contact/accommodation details, but must not receive cost data.
-- Provide a users page where the owner assigns visibility/access settings. Do not provide a switch that grants a second application editor contrary to the sole-owner rule.
+- Provide a users page where the owner or an editor manages access. Editors have full planning, billing and user-management access; family and reception roles remain view-only. Changing access revokes the affected account's sessions.
 - Login uses username and password. Final account-bootstrap/recovery details are deferred.
 - Visibility and mutation checks apply on the server, including live streams, exports, error messages, and direct API calls.
 

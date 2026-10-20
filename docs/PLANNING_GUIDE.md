@@ -1,6 +1,6 @@
 # Planning guide
 
-Only your owner login can change this plan. Family viewers see their own side; reception sees operational details and contact numbers, with no costs or private notes.
+The owner and full-access editors can change this plan, billing and user access. Family viewers see their own side; reception sees operational details and contact numbers, with no costs or private notes.
 
 ## 1. Enter people privately
 
@@ -26,7 +26,7 @@ To place only some members together, choose **Choose people** on the target room
 
 Room details provide per-night locks, unassignment and room swaps. **Undo/redo** applies to assignment changes, not every kind of edit. Locks and current rules are checked again when undoing. Split-family warnings can require confirmation during history actions too.
 
-The right panel distinguishes actual heads, Wyndham's 44 rooms, the six secondary rooms, staff beds, side usage, extra bedding and the estimate. Family viewers do not receive other-side room usage. Included bedding has no extra hotel charge.
+The right panel distinguishes physical people from hotel guests counted for the selected night. For a child aged 10 or under, open the assigned room and tick **Separate bed** on each applicable night; only then does that child enter the hotel's guest count, accommodation allowance and excess calculation. A room move clears that child's bed choice in the old room. The panel also shows Wyndham's 44 rooms, six secondary rooms, staff beds, side usage, extra bedding and the estimate. Family viewers do not receive other-side room usage. Included bedding has no extra hotel charge.
 
 ## 4. Suggest an initial plan
 
@@ -42,13 +42,13 @@ Use typed conditional rules for allowed rooms by side/tag, a side room maximum, 
 
 In **Attendance & billing**, record meals by person, day and location, with separate planned/actual status. Mark package-covered food **Included**, separate food **Chargeable**, and unsettled coverage **Unconfirmed**. The same person/date/meal cannot count at two locations on the same basis. Unknown actual attendance is not assumed present or absent.
 
-Wyndham excess uses chargeable residents above 128 for each night independently, at INR 5,000/person/night including food and taxes. Age 10 is a child; age 11 is adult-counted. Wyndham staff meals use INR 150/person/meal. Guest meal prices remain blank until supplied. The second hotel is a provisional whole-property INR 18,000/day, not six times that rate; select billable days explicitly and leave additional-person rates unpriced until known.
+Wyndham excess uses counted hotel guests above 128 for each night independently, at INR 5,000/person/night including food and taxes. Age 10 is a child and counts only with a separate bed for that night; age 11 counts automatically. Meal attendance is tracked separately from bed counting. Wyndham staff meals use INR 150/person/meal. Guest meal prices remain blank until supplied. The second hotel is a provisional whole-property INR 18,000/day, not six times that rate; select billable days explicitly and leave additional-person rates unpriced until known.
 
 The displayed amount is a **known subtotal**, with unresolved items separately visible. It remains an estimate. Saving a snapshot preserves its rates and calculated amounts even after later rate edits; this is not a hotel invoice or payment operation.
 
 ## 6. Excel and simultaneous use
 
-Download the owner template or export your current plan. Import only the **Guests** sheet through the preview. Preserve Guest ID and Family ID for updates; blank IDs create new slots. Duplicate names warn; duplicate IDs or invalid rows block application. Import does not delete guests or import assignments, room settings, rates or attendance. Exports include the scoped current assignments, arrivals, functions and meals, plus owner-only estimates.
+Download the editor template or export your current plan. Import only the **Guests** sheet through the preview. Preserve Guest ID and Family ID for updates; blank IDs create new slots. Duplicate names warn; duplicate IDs or invalid rows block application. Import does not delete guests or import assignments, room settings, rates or attendance. Exports include the scoped current assignments, per-night separate-bed choices, arrivals, functions and meals, plus estimates for owners/editors.
 
 Other sessions refresh live; stale writes/previews are rejected. Review again after another change. There is no offline-editing mode. All actual guest information stays in the private database and exports, outside the public repository.
 
@@ -57,4 +57,4 @@ HTTPS sign-in is verified; backup/restore work and final event-use acceptance re
 
 ## 7. Invitation context
 
-**Arrivals & functions** also holds the couple and family directory. Only the owner edits it; family viewers receive their own side. These details never create guest slots or increase resident counts. Keep real guests in the accommodation roster separately and reuse stable IDs when completing names. Functions can include local Asia/Kolkata times (00:00 belongs to its selected date), venue and an https source link. Repeated function names on the same date/side are rejected. Invitation content does not mark anyone attending or charge meals.
+**Arrivals & functions** also holds the couple and family directory. The owner and editors can edit it; family viewers receive their own side. These details never create guest slots or increase resident counts. Keep real guests in the accommodation roster separately and reuse stable IDs when completing names. Functions can include local Asia/Kolkata times (00:00 belongs to its selected date), venue and an https source link. Repeated function names on the same date/side are rejected. Invitation content does not mark anyone attending or charge meals.

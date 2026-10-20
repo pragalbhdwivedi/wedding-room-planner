@@ -106,6 +106,7 @@ def test_scope_no_cost_contact_or_mutation_leak(client,owner,role,side):
     assert viewer.put('/api/planning/reservations',json={'revision':d['revision'],'room_ids':['w-101','w-103','w-201','w-203']},headers=h).status_code==403
     assert viewer.put('/api/planning/rooms/w-102/category',json={'revision':d['revision'],'category':'premium'},headers=h).status_code==403
     assert viewer.put('/api/planning/rooms/w-102/number',json={'revision':d['revision'],'number':'102A'},headers=h).status_code==403
+    assert viewer.put('/api/planning/assignments/'+bride[0]['id']+'/bed',json={'revision':d['revision'],'night':NIGHTS[0],'separate_bed':True},headers=h).status_code==403
     assert viewer.post('/api/planning/assignments/preview',json={'revision':d['revision'],'moves':[{'guest_id':bride[0]['id'],'night':NIGHTS[0],'resource_id':'w-104'}]},headers=h).status_code==403
     if role=='family':
         expected=bride if side=='bride' else groom;other=groom if side=='bride' else bride
@@ -121,13 +122,65 @@ def test_scope_no_cost_contact_or_mutation_leak(client,owner,role,side):
     if role=='family':assert other[0]['name'] not in values and 'CONTACT' not in values
 
 
+def test_editor_can_manage_accounts_guests_rooms_and_costs(client,owner):
+    created=client.post('/api/users',json={'username':'synthetic.editor','display_name':'Synthetic Editor','password':PASSWORD,'role':'family','side':'bride'},headers=headers(owner))
+    assert created.status_code==201,created.text
+    viewer=TestClient(app)
+    assert viewer.post('/api/auth/login',json={'username':'synthetic.editor','password':PASSWORD}).status_code==200
+    promoted=client.patch('/api/users/'+created.json()['id'],json={'version':created.json()['version'],'display_name':'Synthetic Editor','role':'editor','side':None,'active':True},headers=headers(owner))
+    assert promoted.status_code==200,promoted.text
+    assert viewer.get('/api/auth/me').status_code==401
+    editor=TestClient(app)
+    login=editor.post('/api/auth/login',json={'username':'synthetic.editor','password':PASSWORD})
+    assert login.status_code==200 and login.json()['user']['role']=='editor'
+    auth=login.json()
+    assert editor.get('/api/users').status_code==200
+    assert editor.get('/api/planning/billing').status_code==200
+    policy=editor.get('/api/planning/billing').json()['policy']
+    rate=editor.put('/api/planning/billing/rates',json={'revision':revision(editor),**policy,'guest_meals':{},'second_extra_paise':None,'charge_days':[]},headers=headers(auth))
+    assert rate.status_code==200,rate.text
+    assert 'Estimate' in load_workbook(io.BytesIO(editor.get('/api/planning/export.xlsx').content)).sheetnames
+    people=family(editor,auth,[member('Synthetic editor guest')])
+    assign(editor,auth,people,'w-102')
+    changed=editor.put('/api/planning/rooms/w-102/number',json={'revision':revision(editor),'number':'102-editor'},headers=headers(auth))
+    assert changed.status_code==200,changed.text
+    added=editor.post('/api/users',json={'username':'synthetic.more','display_name':'Synthetic Viewer','password':PASSWORD,'role':'reception','side':None},headers=headers(auth))
+    assert added.status_code==201,added.text
+    assert editor.get('/api/planning').json()['resources']
+    editor.close();viewer.close()
+
+
+def test_child_counts_only_with_explicit_bed_for_each_night(client,owner):
+    people=family(client,owner,[member('Synthetic Parent A',31),member('Synthetic Parent B',32),member('Synthetic Child',10)],couple_children=True)
+    for night in NIGHTS:assign(client,owner,people,'w-102',night)
+    child=people[2]
+    first=plan(client)
+    assert first['summary'][NIGHTS[0]]['hotel_guests']==2 and first['summary'][NIGHTS[0]]['uncounted_children']==1
+    assert first['summary'][NIGHTS[0]]['residents']==3 and first['summary'][NIGHTS[0]]['extra_bedding']==0
+    assert all(client.get('/api/planning/billing').json()['nights'][n]['chargeable']==2 for n in NIGHTS)
+    bed=client.put('/api/planning/assignments/'+child['id']+'/bed',json={'revision':revision(client),'night':NIGHTS[0],'separate_bed':True},headers=headers(owner))
+    assert bed.status_code==200,bed.text
+    current=plan(client)
+    assert current['summary'][NIGHTS[0]]['hotel_guests']==3 and current['summary'][NIGHTS[0]]['extra_bedding']==1
+    assert current['summary'][NIGHTS[1]]['hotel_guests']==2 and current['summary'][NIGHTS[1]]['extra_bedding']==0
+    assert client.get('/api/planning/billing').json()['nights'][NIGHTS[0]]['chargeable']==3
+    book=load_workbook(io.BytesIO(client.get('/api/planning/export.xlsx').content))
+    assert any(row[0]==child['id'] and row[1]==NIGHTS[0] and row[3] is True for row in book['Assignments'].values)
+    assert client.put('/api/planning/assignments/'+child['id']+'/bed',json={'revision':current['revision']-1,'night':NIGHTS[0],'separate_bed':False},headers=headers(owner)).status_code==409
+    moved=preview(client,owner,[child],'w-104')
+    assert apply(client,owner,moved).status_code==200
+    assert not next(a for a in plan(client)['assignments'] if a['guest_id']==child['id'] and a['night']==NIGHTS[0]).get('separate_bed',False)
+    assert plan(client)['summary'][NIGHTS[0]]['hotel_guests']==2
+    assert client.put('/api/planning/assignments/'+people[0]['id']+'/bed',json={'revision':revision(client),'night':NIGHTS[0],'separate_bed':True},headers=headers(owner)).status_code==400
+
+
 def test_reservations_capacity_children_bedding_and_ground_floor(client,owner):
     young=family(client,owner,[member('Synthetic Parent A',35),member('Synthetic Parent B',34),member('Synthetic Child A',10),member('Synthetic Child B',4)],couple_children=True)
     assert any(e['code']=='couple_children' for e in preview(client,owner,young,'w-105')['errors'])
     reserve(client,owner)
     assert any(e['code']=='couple_children' for e in preview(client,owner,young,'w-105')['errors'])
     assign(client,owner,young,'w-102')
-    s=plan(client)['summary'][NIGHTS[0]];assert s['assigned']==4 and s['extra_bedding']==1
+    s=plan(client)['summary'][NIGHTS[0]];assert s['assigned']==4 and s['hotel_guests']==2 and s['extra_bedding']==0
     older=family(client,owner,[member('Synthetic Elder',50)],label='Elder')
     assert any(e['code']=='ground_floor' for e in preview(client,owner,older,'w-202')['errors'])
     assign(client,owner,older,'w-104')
@@ -314,6 +367,10 @@ def test_money_nights_staff_meals_ages_and_unknown_prices():
     result=calculate(data,policy,settings,[],[]);assert sum(l['amount_paise'] for l in result['lines'] if l['kind']=='wyndham_excess')==3000000
     data['guests'][0]['age']=10;data['guests'][1]['age']=11
     assert calculate(data,policy,settings,[],[])['nights'][NIGHTS[0]]['chargeable']==131
+    data['assignments'][0]['separate_bed']=True
+    counted=calculate(data,policy,settings,[],[])['nights']
+    assert counted[NIGHTS[0]]['chargeable']==132 and counted[NIGHTS[1]]['chargeable']==131
+    data['assignments'][0].pop('separate_bed')
     staff=[{'id':'staff'+str(i),'age':30,'arrival':None,'category':'staff'} for i in range(5)];data['guests']+=staff
     meals=[{'guest_id':g['id'],'day':NIGHTS[0],'meal':meal,'location':'wyndham','planned':True,'actual':None,'inclusion':'chargeable'} for g in staff for meal in ['lunch','dinner']]
     priced=calculate(data,policy,settings,meals,[])

@@ -16,11 +16,11 @@ from sqlalchemy.orm import Session
 from .config import settings
 from .db import database
 from .models import Audit, EventPolicy, Hotel, LoginSession, LoginThrottle, Room, StaffBed, User, now
-from .security import COOKIE, csrf_for, current_user, digest, dummy_hash, hasher, public_user, require_csrf, require_owner, verify_password
+from .security import COOKIE, csrf_for, current_user, digest, dummy_hash, hasher, public_user, require_csrf, require_editor, verify_password
 
 app = FastAPI(title="Wedding Room Planner", docs_url=None, redoc_url=None, openapi_url=None)
 DB = Annotated[Session, Depends(database)]
-Owner = Annotated[User, Depends(require_owner)]
+Editor = Annotated[User, Depends(require_editor)]
 SignedIn = Annotated[User, Depends(current_user)]
 
 
@@ -72,20 +72,20 @@ class Setup(Credentials):
 
 
 class ViewerCreate(Setup):
-    role: Literal["family", "reception"]
+    role: Literal["editor", "family", "reception"]
     side: Literal["bride", "groom"] | None = None
 
     @model_validator(mode="after")
     def valid_scope(self):
         if (self.role == "family") != (self.side is not None):
-            raise ValueError("Family viewers require a side; reception has no side")
+            raise ValueError("Family viewers require a side; editors and reception have no side")
         return self
 
 
 class ViewerUpdate(Payload):
     version: int = Field(ge=1)
     display_name: str = Field(min_length=1, max_length=80)
-    role: Literal["family", "reception"]
+    role: Literal["editor", "family", "reception"]
     side: Literal["bride", "groom"] | None = None
     active: bool
     password: str | None = Field(default=None, min_length=14, max_length=256)
@@ -100,7 +100,7 @@ class ViewerUpdate(Payload):
     @model_validator(mode="after")
     def valid_scope(self):
         if (self.role == "family") != (self.side is not None):
-            raise ValueError("Family viewers require a side; reception has no side")
+            raise ValueError("Family viewers require a side; editors and reception have no side")
         return self
 
 
@@ -196,12 +196,12 @@ def logout(user: SignedIn, request: Request, response: Response, db: DB):
 
 
 @app.get("/api/users")
-def list_users(owner: Owner, db: DB):
+def list_users(editor: Editor, db: DB):
     return {"users": [public_user(u) for u in db.scalars(select(User).order_by(User.created_at))]}
 
 
 @app.post("/api/users", status_code=201, dependencies=[Depends(require_csrf)])
-def create_user(body: ViewerCreate, owner: Owner, db: DB):
+def create_user(body: ViewerCreate, editor: Editor, db: DB):
     user = User(username=body.username.lower(), display_name=body.display_name.strip(),
                 password_hash=hasher.hash(body.password), role=body.role, side=body.side, active=True)
     db.add(user)
@@ -210,13 +210,13 @@ def create_user(body: ViewerCreate, owner: Owner, db: DB):
     except IntegrityError:
         db.rollback()
         raise HTTPException(409, "That username is already in use")
-    audit(db, owner, "viewer.created", str(user.id), {"role": user.role, "side": user.side})
+    audit(db, editor, "account.created", str(user.id), {"role": user.role, "side": user.side})
     db.commit()
     return public_user(user)
 
 
 @app.patch("/api/users/{user_id}", dependencies=[Depends(require_csrf)])
-def update_user(user_id: uuid.UUID, body: ViewerUpdate, owner: Owner, db: DB):
+def update_user(user_id: uuid.UUID, body: ViewerUpdate, editor: Editor, db: DB):
     user = db.scalar(select(User).where(User.id == user_id).with_for_update())
     if not user:
         raise HTTPException(404, "Viewer not found")
@@ -231,7 +231,7 @@ def update_user(user_id: uuid.UUID, body: ViewerUpdate, owner: Owner, db: DB):
     user.version += 1
     # Any access/password change revokes existing sessions immediately.
     db.execute(delete(LoginSession).where(LoginSession.user_id == user.id))
-    audit(db, owner, "viewer.updated", str(user.id), {"before": before, "after": {"role": user.role, "side": user.side, "active": user.active}, "password_reset": body.password is not None})
+    audit(db, editor, "account.updated", str(user.id), {"before": before, "after": {"role": user.role, "side": user.side, "active": user.active}, "password_reset": body.password is not None})
     db.commit()
     return public_user(user)
 
@@ -246,7 +246,7 @@ def inventory(user: SignedIn, db: DB):
     result = {"hotels": hotels, "rooms": rooms, "family_reserve_pending": policy.family_reserve,
               "staff_beds": [{"id": b.id, "hotel_id": b.hotel_id} for b in db.scalars(select(StaffBed).order_by(StaffBed.id))],
               "stage": "planning", "guest_entry_available": True, "allocation_available": True}
-    if user.role == "owner":
+    if user.role in {"owner", "editor"}:
         result["cost_policy"] = {"wyndham_allowance": policy.wyndham_allowance,
             "wyndham_excess_paise": policy.wyndham_excess_paise, "staff_meal_paise": policy.staff_meal_paise,
             "second_hotel_day_paise": policy.second_hotel_day_paise, "second_hotel_included": policy.second_hotel_included,

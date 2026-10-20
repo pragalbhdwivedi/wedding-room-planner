@@ -153,6 +153,9 @@ def allocate(data,time_limit=10):
     for (i,rid),var in variables.items():
         if solver.boolean_value(var):
             after.extend({'guest_id':g['id'],'night':n,'resource_id':rid} for g in units[i] for n in NIGHTS if active(g,n))
+    previous_beds={(a['guest_id'],a['night'],a['resource_id']) for a in old if a.get('separate_bed')}
+    for a in after:
+        if (a['guest_id'],a['night'],a['resource_id']) in previous_beds:a['separate_bed']=True
     after=sorted(after,key=lambda a:(a['night'],a['guest_id']))
     checked=validate(data,after,before=old)
     if checked['errors']:return {'solver_status':'unresolved','assignments':None,'diagnostics':[e['message'] for e in checked['errors'][:20]],'errors':checked['errors']}

@@ -26,7 +26,7 @@ type User = {
   id: string;
   username: string;
   display_name: string;
-  role: "owner" | "family" | "reception";
+  role: "owner" | "editor" | "family" | "reception";
   side: "bride" | "groom" | null;
   active: boolean;
   version: number;
@@ -58,7 +58,7 @@ type Account = {
   username: string;
   display_name: string;
   password: string;
-  role: "family" | "reception";
+  role: "editor" | "family" | "reception";
   side: "bride" | "groom";
   active: boolean;
   version: number;
@@ -171,7 +171,7 @@ function App() {
     }
   }, [user?.id, page]);
   useEffect(() => {
-    if (user?.role === "owner" && page === "users") loadAccounts();
+    if ((user?.role === "owner" || user?.role === "editor") && page === "users") loadAccounts();
   }, [page, user?.id]);
   useEffect(() => {
     if (!selected && !rules && editing === undefined) return;
@@ -282,7 +282,7 @@ function App() {
       setNotice(
         editing
           ? "Access updated. Previous sessions have been signed out."
-          : "Viewer account created.",
+          : "Account created.",
       );
       loadAccounts();
     } catch (e) {
@@ -300,7 +300,7 @@ function App() {
         ? {
             ...blankAccount(),
             ...item,
-            role: item.role === "reception" ? "reception" : "family",
+            role: item.role === "owner" ? "family" : item.role,
             side: item.side || "bride",
             password: "",
           }
@@ -369,7 +369,7 @@ function App() {
             <h2>{setup ? "Make it yours." : "Welcome back."}</h2>
             <p>
               {setup
-                ? "Create the one owner account. You choose your login; everyone else will have view-only access."
+                ? "Create the one owner account. Full-access editors can be added later from Users & access."
                 : "Sign in to bring the accommodation plan together."}
             </p>
             {error && (
@@ -455,9 +455,11 @@ function App() {
       </main>
     );
 
-  const owner = user.role === "owner",
-    roleLabel = owner
+  const owner = user.role === "owner" || user.role === "editor",
+    roleLabel = user.role === "owner"
       ? "Owner"
+      : user.role === "editor"
+        ? "Editor · Full control"
       : user.role === "reception"
         ? "Reception · View only"
         : `${user.side === "bride" ? "Bride" : "Groom"} side · View only`;
@@ -589,7 +591,7 @@ function App() {
           </span>
           <span className="access-pill">
             <LockKeyhole size={13} />
-            {owner ? "Only you can edit" : "View only"}
+            {owner ? "Editing access" : "View only"}
           </span>
         </header>
         <main className="main-content">
@@ -909,8 +911,7 @@ function App() {
                     Users & access<span className="heading-dot">.</span>
                   </h1>
                   <p>
-                    You make the changes. Your family and reception follow
-                    along.
+                    Owners and editors make changes. Family and reception viewers follow along.
                   </p>
                 </div>
                 <button
@@ -918,17 +919,17 @@ function App() {
                   onClick={() => editAccount(null)}
                 >
                   <Plus size={17} />
-                  Add viewer
+                  Add account
                 </button>
               </div>
               <div className="permission-banner">
                 <ShieldCheck />
                 <div>
-                  <strong>One owner. Thoughtful access.</strong>
+                  <strong>One owner. Full-access editors.</strong>
                   <p>
-                    Only your login can edit. Family viewers see their own side;
-                    reception cannot see costs. Changes to access sign out that
-                    viewer’s existing sessions.
+                    Owners and editors can edit guests, rooms, rates and accounts.
+                    Family viewers see their own side; reception cannot see costs.
+                    Changing access signs out that account’s existing sessions.
                   </p>
                 </div>
               </div>
@@ -959,6 +960,8 @@ function App() {
                           <td>
                             {a.role === "owner"
                               ? "Owner · Full control"
+                              : a.role === "editor"
+                                ? "Editor · Full control"
                               : a.role === "reception"
                                 ? "Reception · View only"
                                 : `${a.side === "bride" ? "Bride" : "Groom"} side · View only`}
@@ -1135,13 +1138,13 @@ function App() {
             className="modal account-modal"
             role="dialog"
             aria-modal="true"
-            aria-label={editing ? "Manage viewer" : "Add viewer"}
+            aria-label={editing ? "Manage account" : "Add account"}
             onSubmit={saveAccount}
           >
             <button
               type="button"
               className="modal-close icon-button"
-              aria-label="Close viewer form"
+              aria-label="Close account form"
               onClick={() => {
                 setEditing(undefined);
                 setError("");
@@ -1149,8 +1152,8 @@ function App() {
             >
               <X />
             </button>
-            <span className="eyebrow">VIEW-ONLY ACCESS</span>
-            <h2>{editing ? "Manage viewer" : "Welcome someone in."}</h2>
+            <span className="eyebrow">ACCOUNT ACCESS</span>
+            <h2>{editing ? "Manage account" : "Welcome someone in."}</h2>
             {error && (
               <div className="alert error" role="alert">
                 {error}
@@ -1214,6 +1217,7 @@ function App() {
                 >
                   <option value="family">Family viewer</option>
                   <option value="reception">Reception viewer</option>
+                  <option value="editor">Editor · full access</option>
                 </select>
               </label>
               {account.role === "family" && (
@@ -1247,7 +1251,7 @@ function App() {
               </label>
             )}
             <button className="primary" disabled={busy}>
-              {busy ? "Saving…" : editing ? "Save access" : "Create viewer"}
+              {busy ? "Saving…" : editing ? "Save access" : "Create account"}
               <ArrowRight size={16} />
             </button>
           </form>

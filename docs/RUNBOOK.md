@@ -28,7 +28,7 @@ Web access initially binds only to the host loopback port 8080. Use an SSH forwa
 
 Open the forwarded page and enter the setup key, display name, chosen username and password of at least 14 characters. There are no default credentials. Owner creation is transactional and single-use; concurrent attempts cannot create a second owner. Keep the chosen password privately. Account recovery is not implemented; do not improvise a public reset endpoint.
 
-After setup, only the owner can create and manage family/reception viewer accounts. Family accounts require a bride/groom side. Reception accounts have no side and do not receive cost policy fields. All viewers are read-only. Updating access, suspending an account or resetting its password revokes that viewer's sessions. Guest, assignment, attendance, event and Excel responses enforce the same side/field restrictions. Family viewers do not receive contacts or private notes; reception receives operational contacts but no cost data.
+After setup, the owner can create full editor, family and reception accounts. Editors have full planning, billing and user-management access; the protected owner account remains unique. Editors can also manage accounts. Family accounts require a bride/groom side. Reception accounts have no side and do not receive cost policy fields. Family and reception viewers are read-only. Updating access, suspending an account or resetting its password revokes that account's sessions. Guest, assignment, attendance, event and Excel responses enforce the same side/field restrictions. Family viewers do not receive contacts or private notes; reception receives operational contacts but no cost data.
 
 ## Restart, persistence and upgrades
 
