@@ -44,6 +44,25 @@ To enable LAN access on an existing deployment, preserve credentials and databas
 
 For a fresh LAN installation, the provisioner accepts `--mode lan --bind-address <private-ip> --origins http://<private-ip>:8080`. It preserves an existing `.env`, so it does not silently change an existing transport policy. For shared HTTPS, configure a trusted domain/proxy, `APP_MODE=production`, `COOKIE_SECURE=true` and one exact `ALLOWED_ORIGINS=https://<hostname>` value. Configure the public proxy to redirect HTTP to HTTPS before displaying the sign-in form; verify an HTTP request gets a redirect with an HTTPS Location, and check that HTTPS does not loop. Preserve the existing private `.env`, secrets and PostgreSQL volume; change only those transport fields, validate Compose, then recreate the services with `sudo docker compose up -d --no-build --wait`. Use the HTTPS address for sign-in afterward: Secure cookies are not sent to the earlier HTTP LAN address. Check public health, signed-out API denial, same-origin sign-in handling, foreign-origin rejection and a real authenticated session on the owner's device. Do not add a wildcard origin or publish the API/database ports.
 
+When Cloudflare Tunnel connects to Nginx Proxy Manager over HTTPS, NPM's ordinary Force SSL rule sees an HTTPS origin connection even for a public HTTP visitor. Keep Force SSL for direct HTTP access, and add a planner-only rule using Cloudflare's original `X-Forwarded-Proto` header. On the NPM host, create `/data/nginx/custom/http_top.conf` with:
+
+```nginx
+map "$host|$http_x_forwarded_proto" $planner_http_visitor {
+    default 0;
+    "planner.kritica.in|http" 1;
+}
+```
+
+Create `/data/nginx/custom/server_proxy.conf` with:
+
+```nginx
+if ($planner_http_visitor) {
+    return 301 https://$host$request_uri;
+}
+```
+
+NPM includes the second file in every proxy host, but the map confines its effect to the planner hostname. Validate with `nginx -t` and reload OpenResty. Check that public HTTP redirects once, preserves a path and query string, and ends on a 200 HTTPS page; check HTTPS API health and signed-out API denial. These custom files are persistent NPM configuration, not generated per-host files. Do not rely on Force SSL alone after moving a hostname behind an HTTPS tunnel.
+
 Backup work was explicitly deferred by the owner on 19 October 2026. No scheduled backup or restore test is claimed. Add off-host database/config backup and verified restore as a separate operational step; container persistence is not a backup.
 
 ## Planning upgrades and rollback
