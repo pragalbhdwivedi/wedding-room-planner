@@ -26,6 +26,6 @@ These remain open as of the 19 October 2026 baseline. Do not invent answers. Mos
 
 ## Explicitly deferred, not blocking the document baseline
 
-Guest ID document retention and post-event disposal remain owner decisions. Reception viewing/printing is authorised; no automatic authenticity verification or permission to publish documents is implied. Uncertain OCR/name matches need review before attaching an ID to a guest.
+Guest ID document retention and post-event disposal remain owner decisions. Reception viewing/printing is authorised; no automatic authenticity verification or permission to publish documents is implied. The owner requested waiting for spelling corrections before adding groom roster entries. Uncertain OCR/name matches stay in the private unmatched collection. Desktop access is still needed to establish WhatsApp collection completeness; live owner/Reception device confirmation remains pending.
 
 One-time invitation function/family transfer and theme reuse are now authorised. Automatic RSVP synchronisation remains outside the approved implementation scope. The core planning workflows are implemented. Physical and cost questions above remain explicit inputs; they are not silently resolved by a successful solver run. See STATUS.md for exact verification and deployment evidence.

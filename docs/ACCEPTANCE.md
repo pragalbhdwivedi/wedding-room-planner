@@ -6,7 +6,8 @@
 - Reception can list/view the image, open the per-guest PDF, download it and print from the PDF viewer. Reception cannot upload, edit planning data or read costs. Family viewers and signed-out callers cannot read document metadata, images or PDFs, even with a known document UUID.
 - Unsupported, animated, malformed, oversized or decompression-bomb images are rejected. Upload needs CSRF, a trusted origin, a current plan revision and a known guest. Source image metadata and original filenames are not retained in the served image.
 - Image/PDF responses are authenticated, no-store, nosniff and same-origin. PDF/image access is audited without document content, numbers or addresses in audit details. A document belonging to another guest cannot be fetched through the wrong guest route.
-- A4 PDF pages preserve complete synthetic front/back images at readable scale. Uploaded real IDs and private roster extracts never enter public source, CI or screenshots.
+- An owner/editor collects an uncertain ID without creating a guest, then matches it to an existing stable guest ID. A repeated source is deduplicated before/after matching; Reception can read the collection but cannot upload or match. Family viewers and signed-out callers cannot access it.
+- Each guest PDF contains one A4 page with complete synthetic front/back images, without cropping. Check both printed images visually and page counts for larger collections. Uploaded real IDs and private roster extracts never enter public source, CI or screenshots.
 
 Status: acceptance plan; actual results are recorded separately in STATUS.md. Use synthetic records only. Bind evidence to the exact source revision and environment; automated results, deployment, and owner acceptance are distinct. The automated suite now includes guest workflows, scope/privacy, allocation jobs, exact money, import/export and additive migration preservation. Browser checks supplement these; neither replaces owner acceptance.
 
