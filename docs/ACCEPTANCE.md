@@ -1,5 +1,13 @@
 # Acceptance checks
 
+## Guest identity documents
+
+- An owner/editor attaches a valid synthetic ID image to an existing guest. The guest count and room assignments stay unchanged. A repeated source upload for that guest returns the existing attachment.
+- Reception can list/view the image, open the per-guest PDF, download it and print from the PDF viewer. Reception cannot upload, edit planning data or read costs. Family viewers and signed-out callers cannot read document metadata, images or PDFs, even with a known document UUID.
+- Unsupported, animated, malformed, oversized or decompression-bomb images are rejected. Upload needs CSRF, a trusted origin, a current plan revision and a known guest. Source image metadata and original filenames are not retained in the served image.
+- Image/PDF responses are authenticated, no-store, nosniff and same-origin. PDF/image access is audited without document content, numbers or addresses in audit details. A document belonging to another guest cannot be fetched through the wrong guest route.
+- A4 PDF pages preserve complete synthetic front/back images at readable scale. Uploaded real IDs and private roster extracts never enter public source, CI or screenshots.
+
 Status: acceptance plan; actual results are recorded separately in STATUS.md. Use synthetic records only. Bind evidence to the exact source revision and environment; automated results, deployment, and owner acceptance are distinct. The automated suite now includes guest workflows, scope/privacy, allocation jobs, exact money, import/export and additive migration preservation. Browser checks supplement these; neither replaces owner acceptance.
 
 | ID | Scenario | Expected result |

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Float, ForeignKey, Index, Integer, String, Text, text
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Float, ForeignKey, Index, Integer, LargeBinary, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -133,6 +133,21 @@ class Guest(Base):
     arrival: Mapped[object | None] = mapped_column(Date, nullable=True)
     tags: Mapped[list] = mapped_column(JSONB, default=list)
     notes: Mapped[str] = mapped_column(Text, default="")
+
+
+class GuestDocument(Base):
+    __tablename__ = "guest_documents"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    guest_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("guests.id", ondelete="CASCADE"), index=True, nullable=True)
+    label: Mapped[str] = mapped_column(String(100), default="ID awaiting match")
+    uploaded_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    source_hash: Mapped[str] = mapped_column(String(64))
+    content: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    __table_args__ = (
+        Index("guest_document_source", "guest_id", "source_hash", unique=True),
+        Index("unmatched_document_source", "source_hash", unique=True, postgresql_where=text("guest_id IS NULL")),
+    )
 
 
 class Resource(Base):
