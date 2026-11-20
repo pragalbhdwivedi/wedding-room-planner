@@ -57,7 +57,7 @@ export function GuestDocuments({ guestId, revision, canUpload, request, refresh 
 
   return (
     <section className="guest-documents">
-      <p>Reception can view these IDs and download or print the PDF.</p>
+      <p>Reception can view these IDs and download or print them together on one A4 page.</p>
       {error && <div className="alert error" role="alert">{error}</div>}
       {message && <p role="status">{message}</p>}
       {canUpload && (
