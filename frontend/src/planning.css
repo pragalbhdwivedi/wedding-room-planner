@@ -1529,3 +1529,9 @@
 .id-image-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 1rem; }
 .id-image-grid a { display: grid; gap: .4rem; }
 .id-image-grid img { display: block; width: 100%; max-height: 330px; object-fit: contain; background: #fff; border-radius: .4rem; }
+.id-collection-list { display: grid; gap: 1.5rem; }
+.id-collection-row { display: grid; grid-template-columns: minmax(100px, 180px) minmax(0, 1fr); align-items: start; gap: 1rem; }
+.id-collection-row img { display: block; width: 100%; max-height: 220px; object-fit: contain; background: #fff; }
+.id-match-controls { display: grid; gap: .5rem; margin-top: 1rem; }
+.id-match-controls label { display: grid; gap: .35rem; }
+@media (max-width: 500px) { .id-collection-row { grid-template-columns: 1fr; } .id-collection-row img { max-height: 250px; } }

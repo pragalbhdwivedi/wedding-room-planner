@@ -7,6 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from fastapi.responses import Response
+from pydantic import BaseModel, ConfigDict, Field
 from PIL import Image, ImageDraw, ImageOps, UnidentifiedImageError
 from sqlalchemy import func, select
 from sqlalchemy.orm import defer
@@ -16,7 +17,7 @@ from .planning_api import DB, Editor, WRITE, record
 from .planning_store import locked_state
 from .security import current_user
 
-router = APIRouter(prefix="/api/planning/guests")
+router = APIRouter(prefix="/api/planning")
 MAX_BYTES = 5 * 1024 * 1024
 MAX_PIXELS = 20_000_000
 MAX_DOCUMENTS = 12
@@ -66,7 +67,8 @@ def prepare_image(content: bytes) -> bytes:
 
 
 def metadata(row):
-    return {"id": str(row.id), "created_at": row.created_at.isoformat()}
+    return {"id": str(row.id), "created_at": row.created_at.isoformat(),
+            "guest_id": str(row.guest_id) if row.guest_id else None, "label": row.label}
 
 
 def store_document(db, guest_id, content, user, revision):
@@ -82,14 +84,14 @@ def store_document(db, guest_id, content, user, revision):
     count = db.scalar(select(func.count()).select_from(GuestDocument).where(GuestDocument.guest_id == guest_id))
     if count >= MAX_DOCUMENTS:
         raise HTTPException(409, "This guest already has 12 ID images; ask an editor to review duplicates")
-    row = GuestDocument(guest_id=guest_id, uploaded_by=user.id, source_hash=source_hash, content=encoded)
+    row = GuestDocument(guest_id=guest_id, uploaded_by=user.id, source_hash=source_hash, content=encoded, label="Guest ID")
     db.add(row)
     db.flush()
     result = record(db, user, state, "guest_document.uploaded", {"guest_id": str(guest_id), "document_id": str(row.id)})
     return {**result, "document": metadata(row), "duplicate": False}
 
 
-@router.get("/{guest_id}/documents")
+@router.get("/guests/{guest_id}/documents")
 def list_documents(guest_id: uuid.UUID, user: Reader, db: DB):
     guest_or_404(db, guest_id)
     rows = db.scalars(select(GuestDocument).options(defer(GuestDocument.content)).where(
@@ -97,7 +99,7 @@ def list_documents(guest_id: uuid.UUID, user: Reader, db: DB):
     return {"documents": [metadata(row) for row in rows]}
 
 
-@router.post("/{guest_id}/documents", dependencies=WRITE)
+@router.post("/guests/{guest_id}/documents", dependencies=WRITE)
 async def upload_document(guest_id: uuid.UUID, file: UploadFile, user: Editor, db: DB,
                           revision: Annotated[int, Form(ge=1)]):
     try:
@@ -115,7 +117,7 @@ def audit_read(db, user, guest_id, action, document_id=None):
     db.commit()
 
 
-@router.get("/{guest_id}/documents/{document_id}/image")
+@router.get("/guests/{guest_id}/documents/{document_id}/image")
 def image_document(guest_id: uuid.UUID, document_id: uuid.UUID, user: Reader, db: DB):
     guest_or_404(db, guest_id)
     row = db.scalar(select(GuestDocument).where(GuestDocument.id == document_id, GuestDocument.guest_id == guest_id))
@@ -128,13 +130,7 @@ def image_document(guest_id: uuid.UUID, document_id: uuid.UUID, user: Reader, db
         "Cross-Origin-Resource-Policy": "same-origin", "X-Content-Type-Options": "nosniff"})
 
 
-@router.get("/{guest_id}/documents.pdf")
-def guest_pdf(guest_id: uuid.UUID, user: Reader, db: DB, download: bool = False):
-    guest_or_404(db, guest_id)
-    rows = list(db.scalars(select(GuestDocument).where(GuestDocument.guest_id == guest_id)
-                          .order_by(GuestDocument.created_at, GuestDocument.id)))
-    if not rows:
-        raise HTTPException(404, "No ID images uploaded for this guest")
+def build_pdf(rows):
     pages = []
     try:
         for index, row in enumerate(rows, 1):
@@ -152,7 +148,106 @@ def guest_pdf(guest_id: uuid.UUID, user: Reader, db: DB, download: bool = False)
     finally:
         for page in pages:
             page.close()
-    audit_read(db, user, guest_id, "guest_document.pdf_downloaded" if download else "guest_document.pdf_viewed")
+    return content
+
+
+def pdf_response(content, identity, download):
     return Response(content, media_type="application/pdf", headers={
-        "Cache-Control": "no-store", "Content-Disposition": f'{"attachment" if download else "inline"}; filename="guest-id-{guest_id}.pdf"',
+        "Cache-Control": "no-store", "Content-Disposition": f'{"attachment" if download else "inline"}; filename="guest-id-{identity}.pdf"',
         "Cross-Origin-Resource-Policy": "same-origin", "X-Content-Type-Options": "nosniff"})
+
+
+@router.get("/guests/{guest_id}/documents.pdf")
+def guest_pdf(guest_id: uuid.UUID, user: Reader, db: DB, download: bool = False):
+    guest_or_404(db, guest_id)
+    rows = list(db.scalars(select(GuestDocument).where(GuestDocument.guest_id == guest_id)
+                          .order_by(GuestDocument.created_at, GuestDocument.id)))
+    if not rows:
+        raise HTTPException(404, "No ID images uploaded for this guest")
+    content = build_pdf(rows)
+    audit_read(db, user, guest_id, "guest_document.pdf_downloaded" if download else "guest_document.pdf_viewed")
+    return pdf_response(content, guest_id, download)
+
+
+def store_intake(db, content, user, revision, label="ID awaiting match"):
+    encoded = prepare_image(content)
+    source_hash = hashlib.sha256(content).hexdigest()
+    state = locked_state(db, revision)
+    existing = db.scalar(select(GuestDocument).options(defer(GuestDocument.content)).where(
+        GuestDocument.source_hash == source_hash).limit(1))
+    if existing:
+        return {"revision": state.revision, "document": metadata(existing), "duplicate": True}
+    count = db.scalar(select(func.count()).select_from(GuestDocument).where(GuestDocument.guest_id.is_(None)))
+    if count >= 1000:
+        raise HTTPException(409, "Review the existing ID collection before adding more images")
+    row = GuestDocument(guest_id=None, uploaded_by=user.id, source_hash=source_hash, content=encoded,
+                        label=label.strip()[:100] or "ID awaiting match")
+    db.add(row); db.flush()
+    result = record(db, user, state, "guest_document.collected", {"document_id": str(row.id)})
+    return {**result, "document": metadata(row), "duplicate": False}
+
+
+@router.get("/id-collection")
+def collection(user: Reader, db: DB):
+    rows = db.scalars(select(GuestDocument).options(defer(GuestDocument.content))
+                      .order_by(GuestDocument.created_at, GuestDocument.id))
+    return {"documents": [metadata(row) for row in rows]}
+
+
+@router.post("/id-collection", dependencies=WRITE)
+async def collect_image(file: UploadFile, user: Editor, db: DB, revision: Annotated[int, Form(ge=1)],
+                         label: Annotated[str, Form(max_length=100)] = "ID awaiting match"):
+    try:
+        content = await file.read(MAX_BYTES + 1)
+    finally:
+        await file.close()
+    return store_intake(db, content, user, revision, label)
+
+
+def collection_row(db, identity):
+    row = db.get(GuestDocument, identity)
+    if not row:
+        raise HTTPException(404, "ID image not found")
+    return row
+
+
+@router.get("/id-collection/{identity}/image")
+def collection_image(identity: uuid.UUID, user: Reader, db: DB):
+    row = collection_row(db, identity)
+    content = row.content
+    audit_read(db, user, row.guest_id or row.id, "guest_document.viewed", row.id)
+    return Response(content, media_type="image/jpeg", headers={"Cache-Control": "no-store",
+        "Cross-Origin-Resource-Policy": "same-origin", "X-Content-Type-Options": "nosniff"})
+
+
+@router.get("/id-collection/{identity}/document.pdf")
+def collection_pdf(identity: uuid.UUID, user: Reader, db: DB, download: bool = False):
+    row = collection_row(db, identity)
+    content = build_pdf([row])
+    audit_read(db, user, row.guest_id or row.id, "guest_document.pdf_downloaded" if download else "guest_document.pdf_viewed", row.id)
+    return pdf_response(content, row.id, download)
+
+
+class MatchInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    guest_id: uuid.UUID
+    revision: int = Field(ge=1)
+
+
+@router.post("/id-collection/{identity}/match", dependencies=WRITE)
+def match_document(identity: uuid.UUID, body: MatchInput, user: Editor, db: DB):
+    state = locked_state(db, body.revision)
+    row = collection_row(db, identity)
+    guest_or_404(db, body.guest_id)
+    if row.guest_id:
+        raise HTTPException(409, "This image is already matched to a guest")
+    duplicate = db.scalar(select(GuestDocument.id).where(GuestDocument.guest_id == body.guest_id,
+        GuestDocument.source_hash == row.source_hash))
+    if duplicate:
+        raise HTTPException(409, "This image is already attached to that guest")
+    count = db.scalar(select(func.count()).select_from(GuestDocument).where(GuestDocument.guest_id == body.guest_id))
+    if count >= MAX_DOCUMENTS:
+        raise HTTPException(409, "This guest already has 12 ID images")
+    row.guest_id = body.guest_id
+    result = record(db, user, state, "guest_document.matched", {"guest_id": str(body.guest_id), "document_id": str(row.id)})
+    return {**result, "document": metadata(row)}

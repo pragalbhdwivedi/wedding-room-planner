@@ -1,6 +1,6 @@
 import { TagPicker } from "./tag-picker";
 import { WeddingDetailsPanel } from "./wedding-details";
-import { GuestDocuments } from "./guest-documents";
+import { GuestDocuments, IDCollection } from "./guest-documents";
 import React, {
   useCallback,
   useEffect,
@@ -401,6 +401,7 @@ const nodeTypes = { room: RoomNode as any };
 export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
   const owner = user.role === "owner" || user.role === "editor";
   const [documentGuest, setDocumentGuest] = useState<Guest | null>(null);
+  const [showIDCollection, setShowIDCollection] = useState(false);
   const [data, setData] = useState<Plan | null>(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
@@ -1619,6 +1620,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
             <b>{data.guests.length}</b> people in roster · {data.families.length}{" "}
             families/groups · {data.guests.filter((g) => g.age === null).length}{" "}
             ages to complete
+            {user.role !== "family" && <button type="button" className="text-button" onClick={() => setShowIDCollection(true)}>ID collection</button>}
             {owner && (
               <a href="/api/planning/export.xlsx?template=true" download>
                 Download import template
@@ -1722,6 +1724,12 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
             )}
           </div>
         </>
+      )}
+      {showIDCollection && user.role !== "family" && (
+        <Dialog title="Guest ID collection" close={() => setShowIDCollection(false)}>
+          <IDCollection revision={data.revision} canUpload={owner} request={request} refresh={refresh}
+            guests={data.guests.map((g) => ({ id: g.id, name: `${guestName(g)} · ${g.group_label || g.side}` }))} />
+        </Dialog>
       )}
       {documentGuest && user.role !== "family" && (
         <Dialog title={`ID documents · ${guestName(documentGuest)}`} close={() => setDocumentGuest(null)}>

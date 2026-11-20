@@ -26,7 +26,7 @@ SignedIn = Annotated[User, Depends(current_user)]
 
 @app.middleware("http")
 async def transport_guard(request: Request, call_next):
-    document_upload = request.url.path.startswith("/api/planning/guests/") and request.url.path.endswith("/documents")
+    document_upload = (request.url.path.startswith("/api/planning/guests/") and request.url.path.endswith("/documents")) or request.url.path == "/api/planning/id-collection"
     if request.method == "POST" and (request.url.path == "/api/planning/import/preview" or document_upload):
         try:
             length=int(request.headers.get("content-length", "-1"))

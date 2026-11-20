@@ -2,6 +2,8 @@
 
 ## Guest ID documents
 
+Choose **ID collection** in Guests & families to collect images whose matching guest is still uncertain. Reception can view these images or download/print their individual PDFs. An owner/editor can select the correct existing person and choose **Attach to guest**; matching does not create a new guest. Review candidate labels against the ID and the received guest list. Unknown people remain unmatched instead of being added twice.
+
 In Guests & families, choose **View IDs** beside the matching person. An owner/editor can attach JPG, PNG or WebP images of the ID front/back, up to 5 MiB each. Unknown names can remain as the existing guest label; identify the correct person before attaching their ID. Re-uploading the same source image for that guest does not create another attachment or another guest.
 
 Reception can view these images and use **Open / print PDF** or **Download PDF**. The PDF contains the guest's uploaded images on separate pages; use the PDF viewer's Print action. Family viewers cannot see ID documents. Identity images remain in private persistent storage, and every image/PDF read requires sign-in. Attaching an ID does not verify its authenticity, assign a room, or change attendance/billing. After a release, refresh an older open tab to see the new controls.

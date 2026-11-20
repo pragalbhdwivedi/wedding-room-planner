@@ -90,3 +90,48 @@ def test_invalid_stale_and_cross_site_documents(client, owner):
     assert upload(client, owner, {"id": str(uuid.uuid4())}).status_code == 404
     with SessionLocal() as db:
         assert db.scalar(select(GuestDocument.id)) is None
+
+
+def test_unmatched_collection_preserves_roster_and_match_uses_stable_guest(client, owner):
+    guest = family(client, owner)[0]
+    before = plan(client)
+    def collect():
+        return client.post('/api/planning/id-collection', headers=headers(owner),
+            data={'revision': revision(client), 'label': 'Synthetic ID awaiting review'},
+            files={'file': ('synthetic.png', image_bytes(), 'image/png')})
+    result = collect()
+    assert result.status_code == 200, result.text
+    doc = result.json()['document']
+    assert doc['guest_id'] is None
+    assert collect().json()['duplicate'] is True
+    assert len(client.get('/api/planning/id-collection').json()['documents']) == 1
+    assert plan(client)['guests'] == before['guests']
+    assert plan(client)['assignments'] == before['assignments']
+    body = {'revision': revision(client), 'guest_id': guest['id']}
+    matched = client.post(f"/api/planning/id-collection/{doc['id']}/match", headers=headers(owner), json=body)
+    assert matched.status_code == 200 and matched.json()['document']['guest_id'] == guest['id']
+    assert collect().json()['duplicate'] is True
+    assert len(client.get(f"/api/planning/guests/{guest['id']}/documents").json()['documents']) == 1
+    assert plan(client)['guests'] == before['guests']
+    assert client.post(f"/api/planning/id-collection/{doc['id']}/match", headers=headers(owner),
+        json={'revision': revision(client), 'guest_id': guest['id']}).status_code == 409
+
+
+def test_collection_reception_reads_but_cannot_match_and_families_cannot_read(client, owner):
+    guest = family(client, owner)[0]
+    result = client.post('/api/planning/id-collection', headers=headers(owner), data={'revision': revision(client)},
+        files={'file': ('synthetic.png', image_bytes(), 'image/png')})
+    doc = result.json()['document']
+    for role, side in [('reception', None), ('family', 'bride')]:
+        username = 'synthetic.collection.' + role
+        assert client.post('/api/users', headers=headers(owner), json={'username': username, 'display_name': 'Synthetic Viewer',
+            'password': PASSWORD, 'role': role, 'side': side}).status_code == 201
+        viewer = TestClient(app)
+        auth = viewer.post('/api/auth/login', json={'username': username, 'password': PASSWORD}).json()
+        for path in ['/api/planning/id-collection', f"/api/planning/id-collection/{doc['id']}/image", f"/api/planning/id-collection/{doc['id']}/document.pdf"]:
+            assert viewer.get(path).status_code == (200 if role == 'reception' else 403)
+            assert TestClient(app).get(path).status_code == 401
+        assert viewer.post('/api/planning/id-collection', headers=headers(auth), data={'revision': revision(client)},
+            files={'file': ('synthetic.png', image_bytes(), 'image/png')}).status_code == 403
+        assert viewer.post(f"/api/planning/id-collection/{doc['id']}/match", headers=headers(auth),
+            json={'revision': revision(client), 'guest_id': guest['id']}).status_code == 403

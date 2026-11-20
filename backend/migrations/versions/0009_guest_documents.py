@@ -12,7 +12,8 @@ depends_on = None
 def upgrade():
     op.create_table("guest_documents",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("guest_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("guests.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("guest_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("guests.id", ondelete="CASCADE"), nullable=True),
+        sa.Column("label", sa.String(100), nullable=False),
         sa.Column("uploaded_by", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
         sa.Column("source_hash", sa.String(64), nullable=False),
         sa.Column("content", sa.LargeBinary(), nullable=False),
@@ -20,7 +21,8 @@ def upgrade():
         sa.CheckConstraint("octet_length(content) BETWEEN 1 AND 5242880", name="guest_document_size"))
     op.create_index("ix_guest_documents_guest_id", "guest_documents", ["guest_id"])
     op.create_index("guest_document_source", "guest_documents", ["guest_id", "source_hash"], unique=True)
-    op.execute("GRANT SELECT, INSERT, DELETE ON guest_documents TO planner_app")
+    op.create_index("unmatched_document_source", "guest_documents", ["source_hash"], unique=True, postgresql_where=sa.text("guest_id IS NULL"))
+    op.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON guest_documents TO planner_app")
 
 
 def downgrade():

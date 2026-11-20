@@ -90,6 +90,8 @@ Attach ID images to the correct individual guest; authenticate every read, disab
 
 The WhatsApp group Final Guest Aadhar is the groom-side source; bride-side collection is under Lists → RSVP. Match existing guest slots before creating people. Uncertain identities remain for review.
 
+Unmatched images may be collected in a private review queue visible to Reception and editors. An editor can attach one to an existing individual after review. Collecting or matching images does not create guest slots or change room assignments. Candidate labels are not verified identities or RSVP confirmations.
+
 - The owner and full-access editor accounts may edit planning data, assignments, child beds, rooms, tags, rules, rates, imports, locks, overrides, and access settings. The owner account remains unique and cannot be demoted through user administration.
 - Family accounts are view-only and limited to their own side.
 - Reception accounts are view-only and may receive relevant guest/contact/accommodation details, but must not receive cost data.

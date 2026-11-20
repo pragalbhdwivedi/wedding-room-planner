@@ -138,12 +138,16 @@ class Guest(Base):
 class GuestDocument(Base):
     __tablename__ = "guest_documents"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    guest_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("guests.id", ondelete="CASCADE"), index=True)
+    guest_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("guests.id", ondelete="CASCADE"), index=True, nullable=True)
+    label: Mapped[str] = mapped_column(String(100), default="ID awaiting match")
     uploaded_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     source_hash: Mapped[str] = mapped_column(String(64))
     content: Mapped[bytes] = mapped_column(LargeBinary)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
-    __table_args__ = (Index("guest_document_source", "guest_id", "source_hash", unique=True),)
+    __table_args__ = (
+        Index("guest_document_source", "guest_id", "source_hash", unique=True),
+        Index("unmatched_document_source", "source_hash", unique=True, postgresql_where=text("guest_id IS NULL")),
+    )
 
 
 class Resource(Base):
