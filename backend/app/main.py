@@ -26,13 +26,14 @@ SignedIn = Annotated[User, Depends(current_user)]
 
 @app.middleware("http")
 async def transport_guard(request: Request, call_next):
-    if request.method == "POST" and request.url.path == "/api/planning/import/preview":
+    document_upload = request.url.path.startswith("/api/planning/guests/") and request.url.path.endswith("/documents")
+    if request.method == "POST" and (request.url.path == "/api/planning/import/preview" or document_upload):
         try:
             length=int(request.headers.get("content-length", "-1"))
         except ValueError:
             return JSONResponse({"detail":"Invalid upload length"},status_code=400)
         if length<0:return JSONResponse({"detail":"Upload Content-Length is required"},status_code=411)
-        if length>5500000:return JSONResponse({"detail":"Workbook exceeds the upload limit"},status_code=413)
+        if length>5500000:return JSONResponse({"detail":"File exceeds the upload limit"},status_code=413)
     if request.method not in {"GET", "HEAD", "OPTIONS"}:
         origin = request.headers.get("origin")
         if request.headers.get("sec-fetch-site") == "cross-site" or (origin and origin.rstrip("/") not in settings().origins):
@@ -120,7 +121,7 @@ def start_session(db: Session, user: User, response: Response) -> dict:
 @app.get("/api/health")
 def health(db: DB):
     revision = db.scalar(text("SELECT version_num FROM alembic_version"))
-    if revision != "0008_fixed_wyndham_inventory":
+    if revision != "0009_guest_documents":
         raise HTTPException(503, "Database migration is pending")
     return {"status": "ok"}
 
@@ -256,5 +257,7 @@ def inventory(user: SignedIn, db: DB):
 
 from .planning_api import router as planning_router
 from .spreadsheet_api import router as spreadsheet_router
+from .documents_api import router as documents_router
 app.include_router(planning_router)
 app.include_router(spreadsheet_router)
+app.include_router(documents_router)

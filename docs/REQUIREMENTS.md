@@ -84,6 +84,12 @@ The selected date/night must show total rooms, used/free/reserved rooms, bride/g
 
 ## R10 - Access
 
+Owner clarification on 20 November 2026: owner/editors may upload guest ID images. Reception may view the images and open, print or download a per-guest PDF. Family viewers must not access document metadata, images or PDFs. Keep documents out of public URLs, general guest exports and public source.
+
+Attach ID images to the correct individual guest; authenticate every read, disable caching, audit uploads and image/PDF access, reject unsupported/oversized images, remove embedded image metadata and deduplicate source images per guest. Identity uploads do not alter guest counts or rooms. Exact ID numbers and addresses do not belong in ordinary guest text fields. Document authenticity verification and retention/post-event deletion are not implied.
+
+The WhatsApp group Final Guest Aadhar is the groom-side source; bride-side collection is under Lists → RSVP. Match existing guest slots before creating people. Uncertain identities remain for review.
+
 - The owner and full-access editor accounts may edit planning data, assignments, child beds, rooms, tags, rules, rates, imports, locks, overrides, and access settings. The owner account remains unique and cannot be demoted through user administration.
 - Family accounts are view-only and limited to their own side.
 - Reception accounts are view-only and may receive relevant guest/contact/accommodation details, but must not receive cost data.

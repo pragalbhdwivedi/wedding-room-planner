@@ -1,5 +1,9 @@
 # Implementation status
 
+## Guest ID documents — 20 November 2026
+
+Implementation is prepared on the guest-documents branch: editor uploads, authenticated Reception image/PDF access, per-guest deduplication, audit records and additive schema `0009_guest_documents`. Remote build, isolated tests and deployment are pending. No identity images, OCR records or real guest records are included in source. Refreshed WhatsApp collection remains dependent on desktop access; existing downloads do not establish that all newer IDs have been collected.
+
 Updated 14 November 2026, Asia/Kolkata. Implementation, automated verification, deployment and owner acceptance are separate states.
 
 | Area | State | Evidence / limit |

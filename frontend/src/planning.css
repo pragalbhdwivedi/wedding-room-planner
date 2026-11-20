@@ -1521,3 +1521,11 @@
   flex: 1 1 160px;
   min-width: 0;
 }
+.guest-documents { display: grid; gap: 1rem; }
+.id-upload-controls { display: grid; gap: .65rem; }
+.id-upload-controls label { display: grid; gap: .5rem; }
+.id-upload-controls input { max-width: 100%; }
+.id-pdf-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; }
+.id-image-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 1rem; }
+.id-image-grid a { display: grid; gap: .4rem; }
+.id-image-grid img { display: block; width: 100%; max-height: 330px; object-fit: contain; background: #fff; border-radius: .4rem; }

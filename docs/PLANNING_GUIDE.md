@@ -1,5 +1,11 @@
 # Planning guide
 
+## Guest ID documents
+
+In Guests & families, choose **View IDs** beside the matching person. An owner/editor can attach JPG, PNG or WebP images of the ID front/back, up to 5 MiB each. Unknown names can remain as the existing guest label; identify the correct person before attaching their ID. Re-uploading the same source image for that guest does not create another attachment or another guest.
+
+Reception can view these images and use **Open / print PDF** or **Download PDF**. The PDF contains the guest's uploaded images on separate pages; use the PDF viewer's Print action. Family viewers cannot see ID documents. Identity images remain in private persistent storage, and every image/PDF read requires sign-in. Attaching an ID does not verify its authenticity, assign a room, or change attendance/billing. After a release, refresh an older open tab to see the new controls.
+
 The owner and full-access editors can change this plan, billing and user access. Family viewers see their own side; reception sees operational details and contact numbers, with no costs or private notes.
 
 ## 1. Enter people privately
