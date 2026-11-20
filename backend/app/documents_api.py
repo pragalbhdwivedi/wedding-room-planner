@@ -1,6 +1,7 @@
 """Private guest identity images; no public file URLs or family-view access."""
 import hashlib
 import io
+import math
 import uuid
 import warnings
 from typing import Annotated
@@ -8,7 +9,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field
-from PIL import Image, ImageDraw, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageDraw, ImageFont, ImageOps, UnidentifiedImageError
 from sqlalchemy import func, select
 from sqlalchemy.orm import defer
 
@@ -131,24 +132,38 @@ def image_document(guest_id: uuid.UUID, document_id: uuid.UUID, user: Reader, db
 
 
 def build_pdf(rows):
-    pages = []
+    images = []
+    page = Image.new("RGB", (1240, 1754), "white")
     try:
-        for index, row in enumerate(rows, 1):
+        for row in rows:
             with Image.open(io.BytesIO(row.content)) as source:
-                image = source.convert("RGB")
-                image.thumbnail((1120, 1534))
-                page = Image.new("RGB", (1240, 1754), "white")
-                page.paste(image, ((1240 - image.width) // 2, (1754 - image.height) // 2))
-                ImageDraw.Draw(page).text((60, 35), f"Guest ID - page {index} of {len(rows)}", fill="black")
-                pages.append(page)
+                images.append(source.convert("RGB"))
+        # Choose the grid giving the largest total image area, without cropping.
+        # Front and back of a landscape ID normally use one column and two rows.
+        def layout(columns):
+            count = math.ceil(len(images) / columns)
+            return (1120 - 24 * (columns - 1)) // columns, (1574 - 24 * (count - 1)) // count
+        def score(columns):
+            width, height = layout(columns)
+            return sum((min(width / im.width, (height - 30) / im.height) ** 2) * im.width * im.height for im in images)
+        columns = max(range(1, min(4, len(images)) + 1), key=score)
+        width, height = layout(columns)
+        draw = ImageDraw.Draw(page)
+        font = ImageFont.load_default(size=22)
+        draw.text((60, 35), f"Guest identification - {len(images)} image(s)", fill="black", font=font)
+        for index, im in enumerate(images):
+            im.thumbnail((width, height - 30))
+            left = 60 + (index % columns) * (width + 24)
+            top = 100 + (index // columns) * (height + 24)
+            page.paste(im, (left + (width - im.width) // 2, top + (height - 30 - im.height) // 2))
+            draw.text((left, top + height - 26), f"Image {index + 1}", fill="black", font=font)
         output = io.BytesIO()
-        pages[0].save(output, "PDF", save_all=True, append_images=pages[1:], resolution=150.0,
-                      title="Guest identification", author="Wedding Room Planner")
-        content = output.getvalue()
+        page.save(output, "PDF", resolution=150.0, title="Guest identification", author="Wedding Room Planner")
+        return output.getvalue()
     finally:
-        for page in pages:
-            page.close()
-    return content
+        page.close()
+        for im in images:
+            im.close()
 
 
 def pdf_response(content, identity, download):

@@ -63,6 +63,8 @@ Dates use Asia/Kolkata. The baseline was reconciled on 19 October 2026. "Confirm
 
 | D55 | 2026-11-20 | Confirmed request; implementation choice | Collect refreshed groom-side IDs from Final Guest Aadhar, match existing guest slots, and attach individual ID images privately. Owner/editors upload; Reception can view images and open/print/download a per-guest PDF. Family viewers have no document access. Preserve room assignments and unrelated guest fields. Store re-encoded image bytes in the private database, authenticate/audit reads and deduplicate guest/source images. Bride-side collection is Lists → RSVP. |
 
+| D56 | 2026-11-20 | Confirmed owner request | Print each guest's ID images together on a single A4 page, fitting front/back without cropping. Keep uncertain groom names pending until the owner supplies spelling corrections. |
+
 ## Future decisions
 
 Append a dated decision for each owner policy change. Mark superseded decisions explicitly and update the canonical requirement and relevant acceptance checks in the same commit. Do not rewrite a proposed design as a confirmed owner decision merely because it appeared in an assistant explanation.

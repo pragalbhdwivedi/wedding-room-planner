@@ -44,12 +44,22 @@ def test_id_upload_deduplication_pdf_and_audit(client, owner):
     pdf = client.get(base + "/documents.pdf?download=true")
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF-")
     assert pdf.headers["content-disposition"].startswith("attachment")
-    assert b"/Count 2" in pdf.content
+    assert b"/Count 1" in pdf.content
     assert "guest_documents" not in client.get("/api/planning").text
     with SessionLocal() as db:
         actions = list(db.scalars(select(Audit.action)))
         assert actions.count("guest_document.uploaded") == 2
         assert "guest_document.pdf_downloaded" in actions
+
+
+def test_all_id_images_fit_on_one_page_without_dropping_images():
+    from types import SimpleNamespace
+    from app.documents_api import build_pdf
+    for count in (1, 2, 3, 12):
+        rows = [SimpleNamespace(content=image_bytes("blue" if i % 2 else "green")) for i in range(count)]
+        pdf = build_pdf(rows)
+        assert b"/Count 1" in pdf
+        assert b"/Count 2" not in pdf
 
 
 def test_document_role_boundaries_and_foreign_guest(client, owner):
