@@ -7,6 +7,11 @@ DAYS = (*NIGHTS, "2026-11-26")
 STAFF = {"driver", "staff", "vendor"}
 
 
+def is_active_guest(guest):
+    """Missing probability in legacy snapshots means the original active state."""
+    return guest.get("probability", 100) >= 50
+
+
 def age_band(guest):
     age=guest.get("age")
     return ("adult" if age>10 else "child") if age is not None else guest.get("age_band","unknown")
@@ -16,7 +21,7 @@ def is_adult(guest):return age_band(guest)=="adult"
 
 
 def counted_hotel_guest(guest, assignment):
-    return guest["category"]=="guest" and (is_adult(guest) or age_band(guest)=="child" and assignment.get("separate_bed",False))
+    return is_active_guest(guest) and guest["category"]=="guest" and (is_adult(guest) or age_band(guest)=="child" and assignment.get("separate_bed",False))
 
 
 def is_friend(guest):
@@ -24,7 +29,7 @@ def is_friend(guest):
 
 
 def friend_rosters(data):
-    return {f['id'] for f in data['families'] if (people:=[g for g in data['guests'] if g['family_id']==f['id'] and g['category']=='guest']) and all(is_friend(g) for g in people)}
+    return {f['id'] for f in data['families'] if (people:=[g for g in data['guests'] if is_active_guest(g) and g['family_id']==f['id'] and g['category']=='guest']) and all(is_friend(g) for g in people)}
 
 
 def friend_pair(a,b):
@@ -32,7 +37,7 @@ def friend_pair(a,b):
 
 
 def active(guest, night):
-    return guest.get("arrival") in NIGHTS and guest["arrival"] <= night <= NIGHTS[-1]
+    return is_active_guest(guest) and guest.get("arrival") in NIGHTS and guest["arrival"] <= night <= NIGHTS[-1]
 
 
 def matches(guest, rule):
@@ -49,6 +54,9 @@ def issue(code, message, *, severity="hard", guests=(), resources=(), night=None
 def resource_issues(guest, resource, snapshot):
     result = []
     def fail(code, message):result.append(issue(code, message, guests=[guest["id"]], resources=[resource["id"]]))
+    if not is_active_guest(guest):
+        fail("archived_guest", "This guest is archived below 50% probability. Restore them before assigning a room or bed.")
+        return result
     if (guest["category"] in STAFF) != (resource["hotel_id"] == "staff"):
         fail("staff_separation", "This placement mixes guest accommodation and staff/dormitory use.")
     if age_band(guest)=="unknown":
@@ -118,6 +126,8 @@ def validate(snapshot, assignments, *, before=None):
         if gid not in guests or rid not in resources or night not in NIGHTS:
             result.append(issue("invalid_reference", "The plan references a missing guest, room or night."));continue
         g,r = guests[gid], resources[rid]
+        if not is_active_guest(g):
+            result.append(issue("archived_guest", "This guest is archived below 50% probability. Restore them before assigning a room or bed.", guests=[gid], night=night));continue
         if not active(g,night):result.append(issue("stay", "The guest is not resident on this night.", guests=[gid], night=night))
         for item in resource_issues(g,r,snapshot):
             item["night"]=night;item["id"] += ":"+night;result.append(item)
@@ -130,7 +140,7 @@ def validate(snapshot, assignments, *, before=None):
         for a,b in combinations(people,2):
             if not compatible(a,b,links):result.append(issue("compatibility", "This placement conflicts with saved sharing preferences or exclusions.", guests=[a["id"],b["id"]], resources=[rid],night=night))
     if snapshot["reserved_count"]==0:
-        premium={a['resource_id'] for a in assignments if a['resource_id'] in resources and resources[a['resource_id']]['hotel_id']=='wyndham' and resources[a['resource_id']]['category']=='premium'}
+        premium={rid for rid,night in cells if resources[rid]['hotel_id']=='wyndham' and resources[rid]['category']=='premium'}
         premium_count=sum(r['hotel_id']=='wyndham' and r['category']=='premium' for r in resources.values())
         if len(premium)>premium_count-4:result.append(issue('reserve_pool','Fewer than four Premium rooms remain unused across both nights.',resources=premium))
     rosters=friend_rosters(snapshot)
@@ -163,7 +173,7 @@ def validate(snapshot, assignments, *, before=None):
                 for people in parts.values():
                     if len({g["side"] for g in people})>1:result.append(issue("rule_"+rule["id"],rule["name"],severity=rule["severity"],guests=[g["id"] for g in people],resources={by_guest[(g["id"],night)] for g in people},night=night))
     if before is not None:
-        def occupants(values,rid,night):return {a["guest_id"] for a in values if a["resource_id"]==rid and a["night"]==night}
+        def occupants(values,rid,night):return {a["guest_id"] for a in values if a["resource_id"]==rid and a["night"]==night and (a['guest_id'] not in guests or is_active_guest(guests[a['guest_id']]))}
         for lock in snapshot.get("locks",[]):
             rid,night=lock["resource_id"],lock["night"]
             if occupants(before,rid,night)!=occupants(assignments,rid,night):result.append(issue("locked", "This move changes a locked room or bed.",resources=[rid],night=night))
@@ -172,7 +182,7 @@ def validate(snapshot, assignments, *, before=None):
 
 
 def summaries(snapshot, assignments, guest_ids=None):
-    selected=[g for g in snapshot["guests"] if guest_ids is None or g["id"] in guest_ids]
+    selected=[g for g in snapshot["guests"] if is_active_guest(g) and (guest_ids is None or g["id"] in guest_ids)]
     resources={r["id"]:r for r in snapshot["resources"]}
     out={}
     for night in NIGHTS:

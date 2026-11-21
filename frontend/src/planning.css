@@ -1522,6 +1522,16 @@
   min-width: 0;
 }
 .guest-documents { display: grid; gap: 1rem; }
+.roster-tabs { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0; }
+.roster-tabs button { min-height: 44px; padding: .65rem 1rem; border: 1px solid var(--line, #d8e2f2); border-radius: .65rem; background: var(--surface, #fff); color: var(--ink, #18243b); }
+.roster-tabs button[aria-pressed="true"] { background: var(--action, #075dce); color: var(--on-action, #fff); border-color: transparent; }
+.guest-total b { color: var(--ink, #18243b); }
+.probability-control { display: flex; flex-wrap: wrap; gap: .45rem; align-items: end; margin-top: .65rem; }
+.probability-control label { display: grid; gap: .2rem; font-size: .8rem; font-weight: 500; }
+.probability-input { display: inline-flex; align-items: center; gap: .3rem; }
+.probability-control input { width: 5.25rem; min-height: 44px; padding: .5rem; }
+.probability-control button { min-height: 44px; }
+.archive-badge { display: block; margin-top: .5rem; font-size: .8rem; color: var(--muted, #5b6983); }
 .id-upload-controls { display: grid; gap: .65rem; }
 .id-upload-controls label { display: grid; gap: .5rem; }
 .id-upload-controls input { max-width: 100%; }

@@ -60,6 +60,7 @@ type Guest = {
   family_id: string;
   name: string | null;
   age: number | null;
+  probability: number;
   age_band?: "adult" | "child" | "unknown";
   group_label?: string;
   gender?: "male" | "female" | "unspecified";
@@ -162,18 +163,22 @@ const dayName = (s: string) =>
   });
 const roomName = (r: Resource) =>
   r.number || `Unnumbered · ${r.id.replace("second-", "")}`;
+const guestSlot = (g: Guest) =>
+  g.tags.map((tag) => tag.match(/(?:^|_)slot_(\d+)$/)?.[1]).find(Boolean) || g.id.slice(0, 4);
 const guestName = (g?: Guest) =>
   !g
     ? "Guest no longer listed"
     : g.name ||
-      `${g.group_label || "Unnamed guest"} · ${g.age_band === "adult" ? "Adult" : g.age_band === "child" ? "Child" : "Guest"} ${g.tags.find((t) => t.startsWith("slot_"))?.slice(5) || g.id.slice(0, 4)}`;
+      `${g.group_label || "Unnamed guest"} · ${g.age_band === "adult" ? "Adult" : g.age_band === "child" ? "Child" : "Guest"} ${guestSlot(g)}`;
 const guestCategory = (g: Guest) =>
   g.category === "guest" && g.sharing_mode === "friends"
     ? `Friends · ${g.gender === "unspecified" || !g.gender ? "gender pending" : g.gender}`
     : g.category;
-const occupied = (g: Guest, n: string) => !!g.arrival && g.arrival <= n;
+const isActiveGuest = (g: Guest) => (g.probability ?? 100) >= 50;
+const occupied = (g: Guest, n: string) => isActiveGuest(g) && !!g.arrival && g.arrival <= n;
 const emptyMember = () => ({
   name: "",
+  probability: "100",
   age: "",
   age_band: "unknown",
   gender: "unspecified",
@@ -184,6 +189,33 @@ const emptyMember = () => ({
   tags: "",
   notes: "",
 });
+
+function ProbabilityControl({ guest, disabled, save }: {
+  guest: Guest;
+  disabled: boolean;
+  save: (value: number) => Promise<void>;
+}) {
+  const saved = guest.probability ?? 100;
+  const [draft, setDraft] = useState(String(saved));
+  useEffect(() => setDraft(String(saved)), [guest.id, saved]);
+  const valid = /^\d{1,3}$/.test(draft) && Number(draft) <= 100;
+  const changed = Number(draft) !== saved;
+  return <div className="probability-control">
+    <label>
+      <span>Probability</span>
+      <span className="probability-input">
+        <input aria-label={`Probability for ${guestName(guest)}`} type="number"
+          inputMode="numeric" min={0} max={100} step={1} value={draft}
+          disabled={disabled} aria-invalid={draft !== "" && !valid}
+          onChange={(event) => setDraft(event.target.value)} />
+        <span>%</span>
+      </span>
+    </label>
+    {changed && <button type="button" className="text-button" disabled={disabled || !valid}
+      aria-label={`Save probability for ${guestName(guest)}`}
+      onClick={() => save(Number(draft))}>Save</button>}
+  </div>;
+}
 function detailMessage(d: any) {
   return typeof d === "string"
     ? d
@@ -413,6 +445,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
     [search, setSearch] = useState(""),
     [side, setSide] = useState(user.role === "family" ? user.side! : "all");
   const [roomView, setRoomView] = useState("rooms");
+  const [rosterView, setRosterView] = useState<"active" | "archive">("active");
   const [destinations, setDestinations] = useState<Record<string, any>>({});
   const [selection, setSelection] = useState<string[]>([]),
     [groupMode, setGroupMode] = useState(true),
@@ -657,6 +690,19 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
       setBusy(false);
     }
   }
+  async function saveProbability(guest: Guest, probability: number) {
+    if (!data || !owner) return;
+    const result = await action(`/guests/${guest.id}/probability`, {
+      revision: data.revision, probability,
+    }, "PUT");
+    if (!result) return;
+    setSelection((ids) => ids.filter((id) => id !== guest.id));
+    setNotice(probability < 50
+      ? `${guestName(guest)} moved to Archive and excluded from planning counts. Room placements released.`
+      : !isActiveGuest(guest)
+        ? `${guestName(guest)} restored to the active list. Room placement can be chosen again.`
+        : `Probability saved for ${guestName(guest)}.`);
+  }
   function openPreview(result: Preview) {
     setPreview(result);
     setAcks([]);
@@ -830,13 +876,17 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
         flow.fitView({ padding: 0.15, maxZoom: 1.2 }),
       );
   }, [flow, hotel, block, floor]);
+  const activeGuests = data?.guests.filter(isActiveGuest) || [];
+  const archivedGuests = data?.guests.filter((g) => !isActiveGuest(g)) || [];
+  const listGuests = page === "guests" && rosterView === "archive" ? archivedGuests : activeGuests;
   const families =
     data?.families.filter(
       (f) =>
         (side === "all" || f.side === side) &&
+        listGuests.some((g) => g.family_id === f.id) &&
         (!search ||
           f.label.toLowerCase().includes(search.toLowerCase()) ||
-          data.guests.some(
+          listGuests.some(
             (g) =>
               g.family_id === f.id &&
               [g.name, g.phone].some((v) =>
@@ -845,12 +895,12 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
           )),
     ) || [];
   const filteredGuests =
-    data?.guests.filter((g) => families.some((f) => f.id === g.family_id)) ||
+    listGuests.filter((g) => families.some((f) => f.id === g.family_id)) ||
     [];
   const selectedGuests =
-    data?.guests.filter((g) => selection.includes(g.id)) || [];
+    activeGuests.filter((g) => selection.includes(g.id));
   const pickerCandidates = pickerRoom && data
-    ? data.guests.filter(
+    ? activeGuests.filter(
         (g) =>
           occupied(g, night) &&
           !data.assignments.some(
@@ -905,6 +955,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
       members: d.members.map((g: any) => ({
         ...(g.id ? { id: g.id } : {}),
         name: g.name || null,
+        probability: Number(g.probability ?? 100),
         age: g.age === "" ? null : Number(g.age),
         age_band:
           g.age === ""
@@ -1037,7 +1088,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
     .sort((a, b) => Number(a.number) - Number(b.number));
   const currentJob = jobs[0];
   const reservePending = owner && data.reserved_count !== 4;
-  const sourcePending = data.guests.some((g) =>
+  const sourcePending = activeGuests.some((g) =>
     g.tags.includes("arrival_unconfirmed") || g.tags.includes("headcount_unconfirmed"));
   const notificationCount = Number(Boolean(notice)) + Number(reservePending) +
     Number(sourcePending) + Number(summary.unconfirmed_ages > 0) + Number(owner && Boolean(currentJob));
@@ -1617,8 +1668,8 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
       {page === "guests" && (
         <>
           <div className="guest-total">
-            <b>{data.guests.length}</b> people in roster · {data.families.length}{" "}
-            families/groups · {data.guests.filter((g) => g.age === null).length}{" "}
+            <b>{activeGuests.length}</b> active guests · {archivedGuests.length} archived · {data.families.length}{" "}
+            families/groups · {activeGuests.filter((g) => g.age === null).length}{" "}
             ages to complete
             {user.role !== "family" && <button type="button" className="text-button" onClick={() => setShowIDCollection(true)}>ID collection</button>}
             {owner && (
@@ -1627,6 +1678,13 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
               </a>
             )}
           </div>
+          <div className="roster-tabs" role="group" aria-label="Guest lists">
+            <button type="button" aria-pressed={rosterView === "active"}
+              onClick={() => setRosterView("active")}>Active ({activeGuests.length})</button>
+            <button type="button" aria-pressed={rosterView === "archive"}
+              onClick={() => setRosterView("archive")}>Archive ({archivedGuests.length})</button>
+          </div>
+          <p className="form-help">Guests at 50% or above count in the plan. Below 50% moves them to Archive and releases their room placements. Restore them by setting 50% or more.</p>
           <div className="family-list">
             {families.map((f) => (
               <section className="family-panel" key={f.id}>
@@ -1636,7 +1694,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                   </span>
                   <h2>{f.label}</h2>
                   <b>
-                    {data.guests.filter((g) => g.family_id === f.id).length}{" "}
+                    {listGuests.filter((g) => g.family_id === f.id).length}{" "}
                     people
                   </b>
                   {owner && (
@@ -1670,12 +1728,16 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.guests
+                      {listGuests
                         .filter((g) => g.family_id === f.id)
                         .map((g) => (
                           <tr key={g.id}>
                             <td>
                               <b>{guestName(g)}</b>
+                              {owner ? <ProbabilityControl guest={g} disabled={busy}
+                                save={(value) => saveProbability(g, value)} />
+                                : <small>Probability {g.probability ?? 100}%</small>}
+                              {!isActiveGuest(g) && <span className="archive-badge">Archived · excluded from counts</span>}
                               {owner && g.notes && (
                                 <small>Private note saved</small>
                               )}
@@ -1707,12 +1769,13 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
             {!families.length && (
               <div className="planning-empty">
                 <UsersRound />
-                <h2>A place for your guest list.</h2>
+                <h2>{rosterView === "archive" ? "No archived guests here." : "A place for your guest list."}</h2>
                 <p>
-                  Add a family or one person. Names and ages can be completed
-                  later.
+                  {rosterView === "archive"
+                    ? "Guests with probability below 50% appear in Archive. Clear search or change Side to see other guests."
+                    : "Add a family or one person. Names and ages can be completed later."}
                 </p>
-                {owner && (
+                {owner && rosterView === "active" && (
                   <button
                     className="primary compact"
                     onClick={() => editFamily()}
@@ -1728,7 +1791,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
       {showIDCollection && user.role !== "family" && (
         <Dialog title="Guest ID collection" close={() => setShowIDCollection(false)}>
           <IDCollection revision={data.revision} canUpload={owner} request={request} refresh={refresh}
-            guests={data.guests.map((g) => ({ id: g.id, name: `${guestName(g)} · ${g.group_label || g.side}` }))} />
+            guests={data.guests.map((g) => ({ id: g.id, name: `${guestName(g)} · ${g.group_label || g.side}${isActiveGuest(g) ? "" : " · Archived"}` }))} />
         </Dialog>
       )}
       {documentGuest && user.role !== "family" && (
@@ -2835,6 +2898,13 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                         />
                       </label>
                       <label>
+                        Probability (%)
+                        <input type="number" inputMode="numeric" min={0} max={100} step={1}
+                          required value={g.probability ?? 100}
+                          onChange={(event) => edit("probability", event.target.value)} />
+                        <small>Below 50% archives this guest and excludes them from counts.</small>
+                      </label>
+                      <label>
                         Adult / child count
                         <select
                           value={g.age === "" ? g.age_band || "unknown" : Number(g.age) > 10 ? "adult" : "child"}
@@ -3617,13 +3687,13 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
           >
             <GuestSelect
               title="First guest"
-              guests={data.guests}
+              guests={activeGuests}
               value={linkDraft.a}
               change={(v) => setLinkDraft({ ...linkDraft, a: v })}
             />
             <GuestSelect
               title="Second guest"
-              guests={data.guests}
+              guests={activeGuests}
               value={linkDraft.b}
               change={(v) => setLinkDraft({ ...linkDraft, b: v })}
             />

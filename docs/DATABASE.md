@@ -16,7 +16,7 @@ The foundation implements PostgreSQL with SQLAlchemy and Alembic. Migration `000
 | layout_nodes | Room/facility reference, schematic coordinates, size; facility nodes are not assignable rooms |
 | room_connections | Room pair, neighbouring/opposite/same-building relationship, provenance/verification state |
 | families | Stable group ID, display label, side, declared headcount reconciliation state |
-| guests | Family, optional name/contact, supplied age or birth date if provided, age certainty, side, guest/driver/staff/vendor category |
+| guests | Family, optional name/contact, supplied age or birth date if provided, age certainty, side, guest/driver/staff/vendor category; integer probability 0–100 with default 100, archived when below 50 |
 | guest_relationships | Guest pair, couple/guardian/sharing relationship, explicit compatibility and visibility |
 | tags, guest_tags | Typed tags and membership, including ground-floor requirement and second-hotel eligibility |
 | stays | Guest, arrival/check-in, departure/check-out, attendance-only versus resident status |

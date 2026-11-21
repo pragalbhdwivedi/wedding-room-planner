@@ -18,6 +18,8 @@ Entering an exact age sets the adult/child choice automatically. Changing that c
 
 Use **Couple with children** for the Superior-room rule and **Eligible for reserved family rooms** only for people allowed in the four family rooms. Built-in tags cover ground floor, restaurant proximity and the second hotel; extra text tags can target conditional rules. An age of 50 or above independently requires ground floor. Staff, drivers and vendors use the separate dormitory, never guest rooms.
 
+In **Guests & families**, each person starts at **100% probability**. Change the percentage beside their name and select **Save**, or edit it in the family form. At **50% or above**, the guest remains active and counts normally. Below **50%**, they move to **Archive**, stop contributing to current planning counts and release their room placements. Their person record, ID documents and attendance history remain saved. Open **Archive** and raise the percentage to 50% or more to restore the guest; choose their room again afterward. Search and Side filters apply to both lists. Excel imports and exports retain probability; an older file without that column preserves existing percentages.
+
 ## 2. Reserve family rooms and verify topology
 
 In **Rooms & rules**, select exactly four Premium rooms. They are excluded from general placement. Alternatively keep the four-room Premium reserve pool until you choose the numbers; four Premium rooms must remain unused across both nights. The other 40 Wyndham rooms are general inventory.

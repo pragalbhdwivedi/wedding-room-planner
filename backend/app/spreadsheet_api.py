@@ -13,12 +13,12 @@ from pydantic import ValidationError
 from sqlalchemy import select
 
 from .models import Family, Guest, PendingChange, now
-from .planning_api import ApplyInput, DB, GuestInput, Editor, Viewer, WRITE, billing_data, event_data, meal_rows, record
-from .planning_rules import issue, validate
-from .planning_store import locked_state, snapshot, visible_plan
+from .planning_api import ApplyInput, DB, GuestInput, Editor, Viewer, WRITE, billing_data, event_data, meal_rows, probability_changes, record
+from .planning_rules import is_active_guest, issue, validate
+from .planning_store import locked_state, set_guest_probability, snapshot, visible_plan
 
 router=APIRouter(prefix="/api/planning")
-HEADERS=['Guest ID','Family ID','Group','Side','Reserved eligible','Couple with children','Name','Age','Category','Phone','Arrival','Tags','Private notes','Age band','Gender','Sharing mode','Family room type']
+HEADERS=['Guest ID','Family ID','Group','Side','Reserved eligible','Couple with children','Name','Age','Category','Phone','Arrival','Tags','Private notes','Age band','Gender','Sharing mode','Family room type','Probability']
 
 
 def safe(value):
@@ -45,7 +45,7 @@ def export(user:Viewer,db:DB,template:bool=False):
     if not template:
         for g in data['guests']:
             f=families[g['family_id']]
-            row=dict(zip(HEADERS,[g['id'],g['family_id'],f['label'],g['side'],f['reserved_eligible'],f['couple_children'],g['name'],g['age'],g['category'],g.get('phone'),g['arrival'],', '.join(g['tags']),g.get('notes',''),g.get('age_band','unknown'),g.get('gender','unspecified'),g.get('sharing_mode','family'),f.get('required_room_type')]))
+            row=dict(zip(HEADERS,[g['id'],g['family_id'],f['label'],g['side'],f['reserved_eligible'],f['couple_children'],g['name'],g['age'],g['category'],g.get('phone'),g['arrival'],', '.join(g['tags']),g.get('notes',''),g.get('age_band','unknown'),g.get('gender','unspecified'),g.get('sharing_mode','family'),f.get('required_room_type'),g.get('probability',100)]))
             sheet.append([safe(row[h]) for h in headers])
         assigned=workbook.create_sheet('Assignments');assigned.append(['Guest ID','Night','Room or bed ID','Separate bed for child'])
         for a in data['assignments']:assigned.append([a['guest_id'],a['night'],a['resource_id'],a.get('separate_bed',False)])
@@ -67,6 +67,7 @@ def export(user:Viewer,db:DB,template:bool=False):
     instructions=workbook.create_sheet('Read me');instructions.append(['Instructions'])
     for text in ['One row is one guest slot. Completing a name does not add a second person.','Preserve Guest ID and Family ID on re-import. Blank IDs create new records, with duplicate warnings.','New groups require Group and Side (bride or groom). Ages may be blank. Supply Age band adult/child for provisional assignment, or unknown to leave unresolved.','Arrival is 2026-11-24, 2026-11-25 or blank for a non-resident. Category: guest, driver, staff, vendor.','Family room type: superior, premium or blank. The choice requires that Wyndham room type; couples with children use Superior.','Built-in tags: ground_floor, second_hotel, near_restaurant. Additional tags use short text.','Use the owner import preview before applying. Import does not delete records or assign rooms.','Private notes and costs are omitted from viewer exports. Formula-like user text is exported as text.']:
         instructions.append([text])
+    instructions.append(['Probability: whole number 0–100. Below 50 archives the guest and releases all room assignments; restoring 50 or above leaves them unassigned. Blank or omitted values preserve existing probability, or default to 100 for new guests. IDs and attendance history are retained.'])
     for s in workbook:decorate(s)
     output=io.BytesIO();workbook.save(output)
     return Response(output.getvalue(),media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',headers={'Content-Disposition':'attachment; filename="wedding-guests-template.xlsx"' if template else 'attachment; filename="wedding-plan.xlsx"'})
@@ -134,13 +135,18 @@ def parse_import(content,current):
             category=str(row.get('Category') or 'guest').strip().lower()
             friend_hint=category=='friends' or bool(set(tags)&{'friends','role_friend'})
             sharing_mode=str(row.get('Sharing mode') or ('friends' if friend_hint else (old or {}).get('sharing_mode','family'))).strip().lower()
-            value=GuestInput(name=name,gender=str(row.get('Gender') or (old or {}).get('gender','unspecified')).strip().lower(),sharing_mode=sharing_mode,age_band=str(row.get('Age band') or (old or {}).get('age_band','unknown')).strip().lower(),age=None if age in [None,''] else int(float(age)),category='guest' if category=='friends' else category,phone=str(row['Phone']) if row.get('Phone') is not None else None,arrival=arrival,tags=tags,notes=str(row.get('Private notes') or ''))
+            probability=row.get('Probability')
+            if probability in [None,'']:probability=(old or {}).get('probability',100)
+            elif isinstance(probability,bool) or float(probability)!=int(float(probability)):
+                raise ValueError('Probability must be a whole number from 0 to 100')
+            else:probability=int(float(probability))
+            value=GuestInput(name=name,gender=str(row.get('Gender') or (old or {}).get('gender','unspecified')).strip().lower(),sharing_mode=sharing_mode,probability=probability,age_band=str(row.get('Age band') or (old or {}).get('age_band','unknown')).strip().lower(),age=None if age in [None,''] else int(float(age)),category='guest' if category=='friends' else category,phone=str(row['Phone']) if row.get('Phone') is not None else None,arrival=arrival,tags=tags,notes=str(row.get('Private notes') or ''))
             if room_type and value.category!='guest':raise ValueError('Room types apply only to hotel guests')
             guest={**value.model_dump(mode='json',exclude={'id'}),'id':gid,'family_id':fid,'side':side,'reserved_eligible':family['reserved_eligible'],'couple_children':family['couple_children'],'required_room_type':room_type}
             if guest['name'] and guest['name'].casefold() in names and not old:warnings.append(issue('import_duplicate_name_'+str(row_index),'A new row has a name already present. Review duplicates before adding another slot.',severity='warning',guests=[gid]))
             if guest['name']:names.add(guest['name'].casefold())
             guests[gid]=guest
-        except (ValueError,TypeError,ValidationError):errors.append({'row':row_index,'message':'Check IDs, consistent family details, integer age, category, date and text lengths. Formula cells are rejected.'})
+        except (ValueError,TypeError,OverflowError,ValidationError):errors.append({'row':row_index,'message':'Check IDs, consistent family details, integer age, probability 0–100, category, date and text lengths. Formula cells are rejected.'})
     workbook.close()
     merged=copy.deepcopy(current);merged['families']=list({**known_families,**families}.values());merged['guests']=list({**known_guests,**guests}.values())
     fmap={f['id']:f for f in merged['families']}
@@ -148,7 +154,8 @@ def parse_import(content,current):
         f=fmap[g['family_id']]
         for key in ['side','reserved_eligible','couple_children','required_room_type']:g[key]=f[key]
     if len(merged['guests'])>1000:errors.append({'row':None,'message':'The event supports at most 1,000 guest slots.'})
-    checked=validate(merged,current['assignments'])
+    active_ids={g['id'] for g in merged['guests'] if is_active_guest(g)}
+    checked=validate(merged,[a for a in current['assignments'] if a['guest_id'] in active_ids])
     previous=validate(current,current['assignments'])
     old_errors={e['id'] for e in previous['errors']}
     errors.extend({'row':None,'message':i['message']} for i in checked['errors'] if i['id'] not in old_errors)
@@ -185,6 +192,7 @@ def apply_import(body:ApplyInput,user:Editor,db:DB):
         row=db.get(Guest,uuid.UUID(g['id']))
         if not row:row=Guest(id=uuid.UUID(g['id']),family_id=uuid.UUID(g['family_id']));db.add(row)
         for k in ['name','age','age_band','gender','sharing_mode','category','phone','tags','notes']:setattr(row,k,g[k])
+        set_guest_probability(db,row,g.get('probability',row.probability if row.probability is not None else 100))
         row.arrival=date.fromisoformat(g['arrival']) if g['arrival'] else None
     db.flush();after=snapshot(db);checked=validate(after,after['assignments'])
     previous=validate(before,before['assignments'])
@@ -192,5 +200,5 @@ def apply_import(body:ApplyInput,user:Editor,db:DB):
     if new_errors:raise HTTPException(409,{'message':'Import conditions changed; preview again','errors':new_errors})
     old={w['id'] for w in previous['warnings']}
     if not {w['id'] for w in checked['warnings'] if w['id'] not in old}.issubset(set(body.acknowledged)):raise HTTPException(409,'Import conditions changed; preview again')
-    count=len(pending.payload['guests']);db.delete(pending)
-    return record(db,user,state,'import.applied',{'rows':count,'warning_ids':body.acknowledged})
+    count=len(pending.payload['guests']);changes=probability_changes(before,pending.payload['guests']);db.delete(pending)
+    return record(db,user,state,'import.applied',{'rows':count,'warning_ids':body.acknowledged,'probability_changes':changes})

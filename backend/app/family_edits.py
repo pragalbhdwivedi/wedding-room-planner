@@ -3,7 +3,7 @@ import copy
 import uuid
 from itertools import islice,product
 
-from .planning_rules import NIGHTS,active,capacity_ok,compatible,resource_issues,validate
+from .planning_rules import NIGHTS,active,capacity_ok,compatible,is_active_guest,resource_issues,validate
 
 
 def project_edit(before,fid,body):
@@ -16,8 +16,10 @@ def project_edit(before,fid,body):
         raise ValueError('A guest slot is duplicated or belongs to another family.')
     removed=sorted(existing-set(supplied))
     people=[]
+    prior={g['id']:g for g in before['guests']}
     for member in body['members']:
         g={**member,'id':str(member.get('id') or uuid.uuid4()),'family_id':fid,'side':family['side'],'group_label':family['label'],'reserved_eligible':family['reserved_eligible'],'couple_children':family['couple_children'],'required_room_type':family['required_room_type']}
+        g['probability']=member.get('probability',prior.get(g['id'],{}).get('probability',100))
         people.append(g)
     data['guests']=[g for g in data['guests'] if g['family_id']!=fid]+people
     data['links']=[link for link in data['links'] if link['a'] not in removed and link['b'] not in removed]
@@ -32,15 +34,18 @@ def changed_rows(before,after):
 
 
 def repair_placements(before,data,fid):
-    gmap={g['id']:g for g in data['guests']};old=[a for a in before['assignments'] if a['guest_id'] in gmap]
-    ids={g['id'] for g in data['guests'] if g['family_id']==fid}
+    prior={g['id']:g for g in before['guests']}
+    restored={g['id'] for g in data['guests'] if g['id'] in prior and not is_active_guest(prior[g['id']]) and is_active_guest(g)}
+    # Restoring attendance never implicitly restores or creates a placement.
+    gmap={g['id']:g for g in data['guests'] if is_active_guest(g) and g['id'] not in restored};old=[a for a in before['assignments'] if a['guest_id'] in gmap]
+    ids={g['id'] for g in gmap.values() if g['family_id']==fid}
     # Include hard must-share companions and their households in the repair unit.
     while True:
         prior=set(ids)
         for link in data['links']:
-            if link['kind']=='must_share' and link['severity']=='hard' and ({link['a'],link['b']}&ids):ids.update([link['a'],link['b']])
+            if link['kind']=='must_share' and link['severity']=='hard' and link['a'] in gmap and link['b'] in gmap and ({link['a'],link['b']}&ids):ids.update([link['a'],link['b']])
         family_ids={gmap[g]['family_id'] for g in ids}
-        ids.update(g['id'] for g in data['guests'] if g['family_id'] in family_ids)
+        ids.update(g['id'] for g in gmap.values() if g['family_id'] in family_ids)
         if ids==prior:break
     baseline=[a for a in old if a['guest_id'] not in ids]
     previous_beds={(a['guest_id'],a['night'],a['resource_id']) for a in old if a.get('separate_bed')}
