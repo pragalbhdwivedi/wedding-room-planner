@@ -596,6 +596,14 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
     setData(d);
   }, [request]);
   useEffect(() => {
+    if (!data) return;
+    const activeIds = new Set(data.guests.filter(isActiveGuest).map((g) => g.id));
+    const prune = (ids: string[]) => ids.every((id) => activeIds.has(id))
+      ? ids : ids.filter((id) => activeIds.has(id));
+    setSelection(prune);
+    setPickerSelection(prune);
+  }, [data]);
+  useEffect(() => {
     refresh().catch((e) => setError(e.message));
     const events = new EventSource("/api/planning/events");
     events.addEventListener("revision", (event) => {
@@ -1668,8 +1676,8 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
       {page === "guests" && (
         <>
           <div className="guest-total">
-            <b>{activeGuests.length}</b> active guests · {archivedGuests.length} archived · {data.families.length}{" "}
-            families/groups · {activeGuests.filter((g) => g.age === null).length}{" "}
+            <b>{activeGuests.length}</b> active guests · {archivedGuests.length} archived · {new Set(activeGuests.map((g) => g.family_id)).size}{" "}
+            active families/groups · {activeGuests.filter((g) => g.age === null).length}{" "}
             ages to complete
             {user.role !== "family" && <button type="button" className="text-button" onClick={() => setShowIDCollection(true)}>ID collection</button>}
             {owner && (
