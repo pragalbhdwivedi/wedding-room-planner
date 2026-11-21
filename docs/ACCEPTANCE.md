@@ -72,6 +72,8 @@ Status: acceptance plan; actual results are recorded separately in STATUS.md. Us
 
 ## Owner acceptance
 
+For a synthetic **24 November only** guest, verify inclusion on the 24th and exclusion from the 25th/26th in room, meal, function and cost counts. A tag edit releases an existing 25th placement while retaining the 24th placement, locks, IDs, probability and history. Manual placement, history and stale solver/import data cannot reintroduce an excluded date. Existing Excel Tags round-trip the setting; clearing it keeps the released placement unassigned. Ordinary pre-arrival manual exceptions and non-resident attendance retain their existing behavior.
+
 Before event-use acceptance, verify attendance probability with synthetic people: all existing/new guests start at 100%; 50% remains active and 49% moves to Archive. Archiving removes every room placement and excludes stored attendance from operational and cost counts while preserving the guest, IDs and history. Restoring to 50% keeps the guest unassigned. Reject invalid percentages, viewer writes and stale changes. Family edits and legacy Excel files that omit probability preserve the saved value. History actions and stale proposals cannot put an archived guest back into a room. Verify editing and Active/Archive navigation on phone and laptop.
 
 Demonstrate a representative family entry, dated allocation, lock, warning override, solver proposal, cost reconciliation, reception view, phone operation, and export with the owner. Record explicit approval before describing the planner as accepted for event use.

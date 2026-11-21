@@ -1,5 +1,9 @@
 # Implementation status
 
+## Explicit single-day attendance — 22 November 2026
+
+The 24 November only tag is implemented across guest displays, dated rooms, allocation, functions, meals and billing. It preserves actual history and releases only excluded-night placements through audited family/Excel edits. Remote verification and deployment of this follow-up are pending; the current deployed release is recorded below.
+
 ## Attendance probability and Archive — 21 November 2026
 
 [PR #29](https://github.com/pragalbhdwivedi/wedding-room-planner/pull/29) added per-guest probability, initially 100%, and Active/Archive lists. Below 50% releases the guest's placements and excludes them from current planning, attendance and cost counts while retaining their person, IDs and history. Restoring 50% or above keeps the guest unassigned. Legacy family edits and Excel files preserve a saved probability when they omit the field.

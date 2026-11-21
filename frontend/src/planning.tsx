@@ -130,6 +130,7 @@ type Preview = {
   families?: number;
   guests?: number;
   importing?: boolean;
+  day_scope_released_assignments?: Assignment[];
   family_edit?: boolean;
   reason?: string;
   edited_guests?: Guest[];
@@ -175,7 +176,11 @@ const guestCategory = (g: Guest) =>
     ? `Friends · ${g.gender === "unspecified" || !g.gender ? "gender pending" : g.gender}`
     : g.category;
 const isActiveGuest = (g: Guest) => (g.probability ?? 100) >= 50;
-const occupied = (g: Guest, n: string) => isActiveGuest(g) && !!g.arrival && g.arrival <= n;
+const presentOnDay = (g: Guest, day: string) =>
+  isActiveGuest(g) && days.includes(day) && (!g.tags.includes("only_24_nov") || day === nights[0]);
+const occupied = (g: Guest, n: string) => presentOnDay(g, n) && !!g.arrival && g.arrival <= n;
+const plannedPresence = (g: Guest) => g.tags.includes("only_24_nov")
+  ? "24 Nov only" : g.arrival ? dayName(g.arrival) : "Event only";
 const emptyMember = () => ({
   name: "",
   probability: "100",
@@ -597,12 +602,12 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
   }, [request]);
   useEffect(() => {
     if (!data) return;
-    const activeIds = new Set(data.guests.filter(isActiveGuest).map((g) => g.id));
-    const prune = (ids: string[]) => ids.every((id) => activeIds.has(id))
-      ? ids : ids.filter((id) => activeIds.has(id));
+    const eligibleIds = new Set(data.guests.filter((g) => occupied(g, night)).map((g) => g.id));
+    const prune = (ids: string[]) => ids.every((id) => eligibleIds.has(id))
+      ? ids : ids.filter((id) => eligibleIds.has(id));
     setSelection(prune);
     setPickerSelection(prune);
-  }, [data]);
+  }, [data, night]);
   useEffect(() => {
     refresh().catch((e) => setError(e.message));
     const events = new EventSource("/api/planning/events");
@@ -905,6 +910,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
   const filteredGuests =
     listGuests.filter((g) => families.some((f) => f.id === g.family_id)) ||
     [];
+  const mealGuests = filteredGuests.filter((g) => presentOnDay(g, mealDay));
   const selectedGuests =
     activeGuests.filter((g) => selection.includes(g.id));
   const pickerCandidates = pickerRoom && data
@@ -1074,7 +1080,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
               : g.age <= 10
                 ? `Child · ${g.age}`
                 : `Age ${g.age}`}{" "}
-            · {g.arrival ? dayName(g.arrival) : "Event only"}
+            · {plannedPresence(g)}
             {assigned ? " · Assigned" : ""}
           </small>
         </span>
@@ -1315,7 +1321,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                       <tr key={g.id}>
                         <td>{guestName(g)}</td>
                         <td>
-                          {g.arrival ? dayName(g.arrival) : "Non-resident"}
+                          {plannedPresence(g)}
                         </td>
                         <td>
                           {presence?.status.replaceAll("_", " ") ||
@@ -1568,7 +1574,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                             const event = functions.events.find(
                               (e: any) => e.id === functionId,
                             );
-                            return !event.side || event.side === g.side;
+                            return presentOnDay(g, event.day) && (!event.side || event.side === g.side);
                           })
                           .map((g) => {
                             const row = functionDraft[g.id] ||
@@ -1755,11 +1761,11 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                                 `${g.age_band || "unknown"} · age pending`}
                             </td>
                             <td>
-                              {g.arrival ? dayName(g.arrival) : "Event only"}
+                              {plannedPresence(g)}
                             </td>
                             <td>
                               {guestCategory(g)}
-                              <small>{g.tags.join(", ") || "No tags"}</small>
+                              <small>{g.tags.map((tag) => tag === "only_24_nov" ? "24 Nov only" : tag).join(", ") || "No tags"}</small>
                             </td>
                             {user.role !== "family" && (
                               <td>{g.phone || "—"}</td>
@@ -2623,7 +2629,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                 onClick={() =>
                   changeMeals(
                     Object.fromEntries(
-                      filteredGuests.map((g) => [
+                      mealGuests.map((g) => [
                         g.id,
                         { ...attendance(g), planned: true },
                       ]),
@@ -2666,7 +2672,7 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredGuests.map((g) => {
+                  {mealGuests.map((g) => {
                     const m = attendance(g);
                     const change = (key: string, value: any) =>
                       changeMeals((current) => ({
@@ -3176,6 +3182,12 @@ export function PlanningWorkspace({ user, csrf, page, onExpired }: Props) {
               : "Your current plan stays unchanged until you apply this exact preview."}
           </p>
           {preview.reason && <p className="alert">{preview.reason}</p>}
+          {!!preview.day_scope_released_assignments?.length && <div className="edited-details">
+            <b>Room placements to release for excluded dates</b>
+            <ul>{preview.day_scope_released_assignments.map((assignment) => <li key={`${assignment.guest_id}-${assignment.night}`}>
+              {guestName(data.guests.find((g) => g.id === assignment.guest_id))} · {dayName(assignment.night)}
+            </li>)}</ul>
+          </div>}
           {preview.family_edit && (
             <div className="edited-details">
               {!!preview.removed_guest_ids?.length && (

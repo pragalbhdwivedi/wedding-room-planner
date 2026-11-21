@@ -16,8 +16,8 @@ from .db import SessionLocal, database
 from .models import (AllocationRun, Assignment, Audit, BillSnapshot, BillingSettings, EventAttendance, EventPolicy, Family, FunctionEvent, Guest, GuestLink, GuestPresence,
                      HotelChargeDay, LoginSession, MealAttendance, PendingChange, PlanChange, PlanState,
                      PlanningRule, Resource, Room, RoomConnection, RoomLock, User, WeddingDetails, now)
-from .planning_rules import DAYS, NIGHTS, is_active_guest, issue, validate
-from .planning_store import assignments, hard_check, locked_state, save_assignments, set_guest_probability, snapshot, visible_plan
+from .planning_rules import DAYS, NIGHTS, is_active_guest, issue, present_on_day, validate
+from .planning_store import assignments, hard_check, locked_state, release_unavailable_assignments, save_assignments, set_guest_probability, snapshot, visible_plan
 from .security import COOKIE, current_user, digest, require_csrf, require_editor
 
 router=APIRouter(prefix="/api/planning")
@@ -126,6 +126,12 @@ def ensure_active_guest(guest):
         raise HTTPException(409,"This guest is archived below 50% probability. Restore them before planning rooms or attendance.")
 
 
+def ensure_guest_day(guest,day):
+    ensure_active_guest(guest)
+    if not present_on_day({'probability':guest.probability,'tags':guest.tags},day):
+        raise HTTPException(409,"This guest is present on 24 November only and cannot be planned on another day.")
+
+
 @router.put('/guests/{guest_id}/probability',dependencies=WRITE)
 def update_probability(guest_id:uuid.UUID,body:ProbabilityInput,user:Editor,db:DB):
     state=locked_state(db,body.revision);guest=db.get(Guest,guest_id)
@@ -183,8 +189,9 @@ def update_family(family_id:uuid.UUID,body:FamilyInput,user:Editor,db:DB):
     try:data,payload=project_edit(before,str(family_id),draft)
     except ValueError as error:raise HTTPException(400,str(error))
     removed=set(payload['removed_guest_ids'])
+    guest_map={g['id']:g for g in data['guests']}
     active_ids={g['id'] for g in data['guests'] if is_active_guest(g)}
-    base=[a for a in before['assignments'] if a['guest_id'] not in removed and a['guest_id'] in active_ids]
+    base=[a for a in before['assignments'] if a['guest_id'] not in removed and a['guest_id'] in active_ids and present_on_day(guest_map[a['guest_id']],a['night'])]
     checked=validate(data,base,before=before['assignments'])
     previous=validate(before,before['assignments'])
     old={w['id'] for w in previous['warnings']}
@@ -194,8 +201,8 @@ def update_family(family_id:uuid.UUID,body:FamilyInput,user:Editor,db:DB):
     added_active=added & active_ids
     placed_family=bool(added_active and all(g['age_band']!='unknown' for g in payload['guests'] if g['id'] in added_active) and any(a['guest_id'] in {g['id'] for g in before['guests'] if g['family_id']==str(family_id)} for a in before['assignments']))
     if not removed and not placed_family and not checked['errors'] and not [w for w in checked['warnings'] if w['id'] not in old]:
-        persist_family_edit(db,payload)
-        return record(db,user,state,'family.updated',{'family_id':str(family_id),'slots':len(body.members),'probability_changes':probability_changes(before,payload['guests'])})
+        released=persist_family_edit(db,payload)
+        return record(db,user,state,'family.updated',{'family_id':str(family_id),'slots':len(body.members),'probability_changes':probability_changes(before,payload['guests']),'day_scope_released_assignments':released})
     after,reason=(repair_placements(before,data,str(family_id)) if checked['errors'] or placed_family else (base,'Review the guest changes and any placement warnings before saving.'))
     if after is None and not checked['errors']:
         after,reason=base,'No safe room placement is available for the added guest. Review saving them unassigned.'
@@ -214,6 +221,7 @@ def update_family(family_id:uuid.UUID,body:FamilyInput,user:Editor,db:DB):
 
 
 def persist_family_edit(db,payload):
+    released=[]
     f=payload['family'];family=db.get(Family,uuid.UUID(f['id']))
     for key in ['label','side','reserved_eligible','couple_children','required_room_type']:setattr(family,key,f[key])
     for guest_id in payload.get('removed_guest_ids',[]):
@@ -230,7 +238,9 @@ def persist_family_edit(db,payload):
         for key in ['name','age','age_band','gender','sharing_mode','category','phone','tags','notes']:setattr(row,key,g[key])
         set_guest_probability(db,row,g.get('probability',row.probability if row.probability is not None else 100))
         row.arrival=date.fromisoformat(g['arrival']) if g['arrival'] else None
+        released.extend(release_unavailable_assignments(db,row))
     db.flush()
+    return released
 
 
 @router.post('/families/apply',dependencies=WRITE)
@@ -238,7 +248,7 @@ def apply_family_edit(body:ApplyInput,user:Editor,db:DB):
     state=locked_state(db,body.revision);pending=db.get(PendingChange,body.token)
     if not pending or pending.kind!='family_edit' or pending.owner_id!=user.id or pending.revision!=state.revision or pending.expires_at<=now():raise HTTPException(409,'This guest-edit preview changed or expired. Review the edit again.')
     before=snapshot(db);old={w['id'] for w in validate(before,before['assignments'])['warnings']}
-    persist_family_edit(db,pending.payload);data=snapshot(db);after=pending.payload['after']
+    released=persist_family_edit(db,pending.payload);data=snapshot(db);after=pending.payload['after']
     result=validate(data,after,before=before['assignments'])
     previous=validate(before,before['assignments'])
     introduced=[e for e in result['errors'] if e['id'] not in {old['id'] for old in previous['errors']}]
@@ -246,7 +256,7 @@ def apply_family_edit(body:ApplyInput,user:Editor,db:DB):
     expected={w['id'] for w in result['warnings'] if w['id'] not in old}
     if expected!={w['id'] for w in pending.warnings} or set(body.acknowledged)!=expected:raise HTTPException(409,'Acknowledge exactly the warnings in this guest-edit preview.')
     if after!=before['assignments']:
-        if pending.payload.get('removed_guest_ids') or any(c['released_assignments'] for c in probability_changes(before,pending.payload['guests'])):
+        if released or pending.payload.get('removed_guest_ids') or any(c['released_assignments'] for c in probability_changes(before,pending.payload['guests'])):
             # A deleted identity cannot safely reappear through assignment undo/redo.
             state.cursor=None;state.redo=[]
         else:
@@ -255,7 +265,7 @@ def apply_family_edit(body:ApplyInput,user:Editor,db:DB):
     elif pending.payload.get('removed_guest_ids'):
         state.cursor=None;state.redo=[]
     fid=pending.payload['family']['id'];db.delete(pending)
-    return record(db,user,state,'family.updated_with_placement',{'family_id':fid,'warning_ids':sorted(expected),'placement_changes':len(changed_rows(before['assignments'],after)),'deleted_guest_ids':pending.payload.get('removed_guest_ids',[]),'probability_changes':probability_changes(before,pending.payload['guests'])})
+    return record(db,user,state,'family.updated_with_placement',{'family_id':fid,'warning_ids':sorted(expected),'placement_changes':len(changed_rows(before['assignments'],after)),'deleted_guest_ids':pending.payload.get('removed_guest_ids',[]),'probability_changes':probability_changes(before,pending.payload['guests']),'day_scope_released_assignments':released})
 
 
 
@@ -466,7 +476,7 @@ class SeparateBedInput(Revision):
 def separate_bed(guest_id:uuid.UUID,body:SeparateBedInput,user:Editor,db:DB):
     state=locked_state(db,body.revision)
     guest=db.get(Guest,guest_id)
-    if guest:ensure_active_guest(guest)
+    if guest:ensure_guest_day(guest,body.night)
     row=db.get(Assignment,(guest_id,date.fromisoformat(body.night)))
     if not guest or not row:raise HTTPException(404,"Assign this child to a hotel room on this night first.")
     resource=db.get(Resource,row.resource_id)
@@ -492,13 +502,13 @@ class Destinations(Revision):
 def destinations(body:Destinations,user:Editor,db:DB):
     locked_state(db,body.revision);data=snapshot(db);ids={str(g) for g in body.guest_ids}
     if not ids.issubset({g['id'] for g in data['guests']}):raise HTTPException(404,"Guest no longer exists")
-    archived=any(g['id'] in ids and not is_active_guest(g) for g in data['guests'])
+    unavailable=any(g['id'] in ids and not present_on_day(g,body.night) for g in data['guests'])
     base=[a for a in data['assignments'] if not (a['guest_id'] in ids and a['night']==body.night)]
     choices={}
     for room in data['resources']:
         rows=base+[{'guest_id':g,'night':body.night,'resource_id':room['id']} for g in ids]
         result=validate(data,rows,before=data['assignments'])
-        choices[room['id']]={'allowed':not archived,'warnings':len(result['errors'])+len(result['warnings']),'reason':result['errors'][0]['message'] if result['errors'] else ''}
+        choices[room['id']]={'allowed':not unavailable,'warnings':len(result['errors'])+len(result['warnings']),'reason':result['errors'][0]['message'] if result['errors'] else ''}
     return {'revision':body.revision,'choices':choices}
 
 
@@ -529,8 +539,8 @@ def advisory_issues(data,after,before):
 
 def preview_plan(db,user,revision,after,kind="assignment",sharing_pairs=(),manual_override=False):
     locked_state(db,revision);before=snapshot(db);result=validate(with_sharing(before,sharing_pairs),after,before=before["assignments"])
-    archived=[i for i in result['errors'] if i['code']=='archived_guest']
-    if archived:return {'errors':archived,'warnings':[],'token':None,'revision':revision}
+    unavailable=[i for i in result['errors'] if i['code'] in {'archived_guest','unavailable_day'}]
+    if unavailable:return {'errors':unavailable,'warnings':[],'token':None,'revision':revision}
     if manual_override:
         warnings=advisory_issues(before,after,before['assignments'])
     else:
@@ -560,7 +570,7 @@ def preview_moves(body:Moves,user:Editor,db:DB):
         seen.add(key)
         guest=db.get(Guest,move.guest_id)
         if not guest:raise HTTPException(404,"Guest no longer exists")
-        if move.resource_id:ensure_active_guest(guest)
+        if move.resource_id:ensure_guest_day(guest,move.night)
         if move.resource_id:
             if not db.get(Resource,move.resource_id):raise HTTPException(404,"Room or bed no longer exists")
             if key not in current or current[key]["resource_id"]!=move.resource_id:
@@ -580,8 +590,8 @@ def apply_assignment(body:ApplyInput,user:Editor,db:DB):
     if not pending or pending.kind!="assignment" or pending.owner_id!=user.id or pending.expires_at<=now():raise HTTPException(409,"This preview expired or was already applied. Preview the move again.")
     if pending.revision!=state.revision:raise HTTPException(409,"The plan changed after preview. Preview again.")
     data=snapshot(db);before=data["assignments"];after=pending.payload["after"]
-    archived=[i for i in validate(data,after)['errors'] if i['code']=='archived_guest']
-    if archived:raise HTTPException(409,{'message':'Archived guests cannot be assigned. Restore them and preview again.','errors':archived})
+    unavailable=[i for i in validate(data,after)['errors'] if i['code'] in {'archived_guest','unavailable_day'}]
+    if unavailable:raise HTTPException(409,{'message':'Archived guests or explicitly excluded nights cannot be assigned. Review the guest and preview again.','errors':unavailable})
     pairs=[tuple(pair) for pair in pending.payload.get("sharing_pairs",[])]
     manual_override=bool(pending.payload.get("manual_override"))
     if not manual_override and not pending.payload.get('allocation_run') and not pending.payload.get('history_direction'):
@@ -634,8 +644,8 @@ def history(body:HistoryInput,user:Editor,db:DB):
         if not change or change.parent!=state.cursor:raise HTTPException(409,"Nothing to redo")
         expected,after=change.before,change.after
     if assignments(db)!=expected:raise HTTPException(409,"The current plan no longer matches this history step.")
-    if any(e['code']=='archived_guest' for e in validate(data,after)['errors']):
-        raise HTTPException(409,'This history step would assign an archived guest. Restore the guest before making a new placement.')
+    if any(e['code'] in {'archived_guest','unavailable_day'} for e in validate(data,after)['errors']):
+        raise HTTPException(409,'This history step would assign an archived guest or an explicitly excluded night. Review the guest before making a new placement.')
     new=advisory_issues(data,after,data['assignments'])
     if new:
         result=preview_plan(db,user,body.revision,after,manual_override=True)
@@ -699,7 +709,7 @@ class Meals(Revision):rows:list[MealInput]=Field(max_length=1000)
 
 
 def meal_rows(db,ids=None):
-    return [{"guest_id":str(m.guest_id),"day":m.day.isoformat(),"meal":m.meal,"location":m.location,"planned":m.planned,"actual":m.actual,"inclusion":m.inclusion} for m in db.scalars(select(MealAttendance).join(Guest,Guest.id==MealAttendance.guest_id).where(Guest.probability>=50)) if ids is None or str(m.guest_id) in ids]
+    return [{"guest_id":str(m.guest_id),"day":m.day.isoformat(),"meal":m.meal,"location":m.location,"planned":m.planned,"actual":m.actual,"inclusion":m.inclusion} for m,g in db.execute(select(MealAttendance,Guest).join(Guest,Guest.id==MealAttendance.guest_id)) if (ids is None or str(m.guest_id) in ids) and present_on_day({'probability':g.probability,'tags':g.tags},m.day.isoformat())]
 
 
 @router.get("/meals")
@@ -719,16 +729,16 @@ def save_meals(body:Meals,user:Editor,db:DB):
         seen.add(key)
         guest=db.get(Guest,item.guest_id)
         if not guest:raise HTTPException(404,"Guest not found")
-        ensure_active_guest(guest)
+        ensure_guest_day(guest,item.day)
         row=db.get(MealAttendance,key)
         if not row:row=MealAttendance(guest_id=key[0],day=key[1],meal=key[2],location=key[3]);db.add(row)
         row.planned,row.actual,row.inclusion=item.planned,item.actual,item.inclusion
     db.flush()
     counts={}
-    for row in db.scalars(select(MealAttendance).join(Guest,Guest.id==MealAttendance.guest_id).where(Guest.probability>=50)):
+    for row in meal_rows(db):
         for basis in ['planned','actual']:
-            if getattr(row,basis) is True:
-                key=(row.guest_id,row.day,row.meal,basis);counts[key]=counts.get(key,0)+1
+            if row[basis] is True:
+                key=(row['guest_id'],row['day'],row['meal'],basis);counts[key]=counts.get(key,0)+1
     if any(count>1 for count in counts.values()):raise HTTPException(409,"The same person cannot be counted for the same meal at two locations. Clear the other location for that attendance basis first.")
     return record(db,user,state,"attendance.saved",{"rows":len(body.rows)})
 
@@ -776,10 +786,10 @@ def add_event(body:EventInput,user:Editor,db:DB):
 
 
 def event_data(db,user):
-    data=visible_plan(db,user);ids={g['id'] for g in data['guests'] if is_active_guest(g)}
+    data=visible_plan(db,user);guests={g['id']:g for g in data['guests'] if is_active_guest(g)}
     events=[{'id':str(e.id),'name':e.name,'day':e.day.isoformat(),'side':e.side,'start_time':e.start_time,'venue':e.venue,'source_url':e.source_url} for e in db.scalars(select(FunctionEvent).order_by(FunctionEvent.day,FunctionEvent.start_time.asc().nullslast(),FunctionEvent.name)) if user.role!='family' or e.side is None or e.side==user.side]
-    event_ids={e['id'] for e in events}
-    rows=[{'event_id':str(a.event_id),'guest_id':str(a.guest_id),'planned':a.planned,'actual':a.actual} for a in db.scalars(select(EventAttendance)) if str(a.guest_id) in ids and str(a.event_id) in event_ids]
+    event_map={e['id']:e for e in events}
+    rows=[{'event_id':str(a.event_id),'guest_id':str(a.guest_id),'planned':a.planned,'actual':a.actual} for a in db.scalars(select(EventAttendance)) if str(a.guest_id) in guests and str(a.event_id) in event_map and present_on_day(guests[str(a.guest_id)],event_map[str(a.event_id)]['day'])]
     return {'revision':data['revision'],'events':events,'rows':rows}
 
 
@@ -805,7 +815,7 @@ def event_attendance(body:EventRows,user:Editor,db:DB):
         if key in seen:raise HTTPException(400,'Duplicate person/event')
         seen.add(key);event=db.get(FunctionEvent,item.event_id);guest=db.get(Guest,item.guest_id)
         if not event or not guest:raise HTTPException(404,'Function or guest not found')
-        ensure_active_guest(guest)
+        ensure_guest_day(guest,event.day.isoformat())
         if event.side and db.get(Family,guest.family_id).side!=event.side:raise HTTPException(400,'This side-specific event does not include that guest side')
         row=db.get(EventAttendance,key)
         if not row:row=EventAttendance(event_id=item.event_id,guest_id=item.guest_id);db.add(row)

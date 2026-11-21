@@ -3,7 +3,7 @@ import copy
 import uuid
 from itertools import islice,product
 
-from .planning_rules import NIGHTS,active,capacity_ok,compatible,is_active_guest,resource_issues,validate
+from .planning_rules import NIGHTS,active,capacity_ok,compatible,is_active_guest,present_on_day,resource_issues,validate
 
 
 def project_edit(before,fid,body):
@@ -37,7 +37,7 @@ def repair_placements(before,data,fid):
     prior={g['id']:g for g in before['guests']}
     restored={g['id'] for g in data['guests'] if g['id'] in prior and not is_active_guest(prior[g['id']]) and is_active_guest(g)}
     # Restoring attendance never implicitly restores or creates a placement.
-    gmap={g['id']:g for g in data['guests'] if is_active_guest(g) and g['id'] not in restored};old=[a for a in before['assignments'] if a['guest_id'] in gmap]
+    gmap={g['id']:g for g in data['guests'] if is_active_guest(g) and g['id'] not in restored};old=[a for a in before['assignments'] if a['guest_id'] in gmap and present_on_day(gmap[a['guest_id']],a['night'])]
     ids={g['id'] for g in gmap.values() if g['family_id']==fid}
     # Include hard must-share companions and their households in the repair unit.
     while True:

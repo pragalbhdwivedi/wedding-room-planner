@@ -20,6 +20,8 @@ Use **Couple with children** for the Superior-room rule and **Eligible for reser
 
 In **Guests & families**, each person starts at **100% probability**. Change the percentage beside their name and select **Save**, or edit it in the family form. At **50% or above**, the guest remains active and counts normally. Below **50%**, they move to **Archive**, stop contributing to current planning counts and release their room placements. Their person record, ID documents and attendance history remain saved. Open **Archive** and raise the percentage to 50% or more to restore the guest; choose their room again afterward. Search and Side filters apply to both lists. Excel imports and exports retain probability; an older file without that column preserves existing percentages.
 
+For a guest attending only on the 24th, tick **24 November only** in their tags. The roster displays **24 Nov only**, and room, function and meal plans exclude them on other dates. Saving releases any room placement on an excluded night while keeping the 24th's placement. Unticking the tag does not restore a released room. Actual arrivals/departures and attendance history remain saved separately.
+
 ## 2. Reserve family rooms and verify topology
 
 In **Rooms & rules**, select exactly four Premium rooms. They are excluded from general placement. Alternatively keep the four-room Premium reserve pool until you choose the numbers; four Premium rooms must remain unused across both nights. The other 40 Wyndham rooms are general inventory.
