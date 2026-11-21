@@ -128,11 +128,13 @@ class Guest(Base):
     age_band: Mapped[str] = mapped_column(String(8), default="unknown", server_default="unknown")
     gender: Mapped[str] = mapped_column(String(16), default="unspecified", server_default="unspecified")
     sharing_mode: Mapped[str] = mapped_column(String(8), default="family", server_default="family")
+    probability: Mapped[int] = mapped_column(Integer, default=100, server_default="100")
     category: Mapped[str] = mapped_column(String(16), default="guest")
     phone: Mapped[str | None] = mapped_column(String(40), nullable=True)
     arrival: Mapped[object | None] = mapped_column(Date, nullable=True)
     tags: Mapped[list] = mapped_column(JSONB, default=list)
     notes: Mapped[str] = mapped_column(Text, default="")
+    __table_args__ = (CheckConstraint("probability BETWEEN 0 AND 100", name="guest_probability_range"),)
 
 
 class GuestDocument(Base):

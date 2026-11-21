@@ -38,6 +38,8 @@ For an upgrade, select and review the intended source commit, preserve `.private
 
 ## Transport and remaining operations
 
+Migration `0010_guest_probability` adds a checked 0–100 integer probability to every guest with default 100. It must preserve existing guest identities, documents, room placements and private access records. Only a later editor change below 50 archives a guest and releases their placements. Apply and verify the migration before starting the matching API/web images; never downgrade a live database to remove this field.
+
 Web access defaults to authenticated SSH forwarding. Local mode accepts loopback origins only. The owner subsequently requested LAN access (D29). An explicit `lan` preview mode supports private IPv4 addresses and loopback origins; public addresses and arbitrary hostnames are rejected. This is an HTTP preview on the trusted LAN: credentials and sessions are not encrypted in transit. Production mode still requires HTTPS origins and Secure cookies. PostgreSQL has no host-published port.
 
 To enable LAN access on an existing deployment, preserve credentials and database volumes, set `WEB_BIND_ADDRESS` to the VM's private address, `APP_MODE=lan`, `COOKIE_SECURE=false`, and `ALLOWED_ORIGINS` to the exact browser origin including port. Keep actual operational addresses only in private `.env` and handover records. Build/check the selected source revision, then recreate application services with `sudo docker compose up -d --wait`. Verify the health/setup endpoints from a different LAN machine, origin rejection and unauthenticated data protection. Do not publish database/API ports or configure internet forwarding as part of LAN exposure.

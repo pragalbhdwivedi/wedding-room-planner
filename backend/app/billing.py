@@ -1,11 +1,11 @@
 """Exact-pa​ise estimates with explicit missing-price and coverage boundaries."""
-from .planning_rules import DAYS, NIGHTS, STAFF, active, age_band, counted_hotel_guest, is_adult
+from .planning_rules import DAYS, NIGHTS, STAFF, active, age_band, counted_hotel_guest, is_active_guest, is_adult
 
 
 def calculate(snapshot, policy, settings, meals, charge_days, *, basis="planned"):
-    guests={g["id"]:g for g in snapshot["guests"]}
+    guests={g["id"]:g for g in snapshot["guests"] if is_active_guest(g)}
     resources={r["id"]:r for r in snapshot["resources"]}
-    rows=snapshot["assignments"]
+    rows=[a for a in snapshot["assignments"] if a['guest_id'] in guests]
     lines=[];unpriced=[];night_totals={}
     for night in NIGHTS:
         night_rows=[a for a in rows if a["night"]==night]

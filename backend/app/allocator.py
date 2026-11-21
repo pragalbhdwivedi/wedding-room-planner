@@ -4,11 +4,11 @@ from itertools import combinations
 
 from ortools.sat.python import cp_model
 
-from .planning_rules import NIGHTS, STAFF, active, building, capacity_ok, compatible, friend_rosters, is_adult, matches, resource_issues, segment, validate
+from .planning_rules import NIGHTS, STAFF, active, building, capacity_ok, compatible, friend_rosters, is_active_guest, is_adult, matches, resource_issues, segment, validate
 
 
 def allocate(data,time_limit=10):
-    guests={g["id"]:g for g in data["guests"] if g["arrival"]}
+    guests={g["id"]:g for g in data["guests"] if g["arrival"] and is_active_guest(g)}
     resources={r["id"]:r for r in data["resources"]}
     if len(guests)>300:return {"solver_status":"input_limit","assignments":None,"diagnostics":["Automatic allocation supports up to 300 resident participants in this event."]}
     parent={g:g for g in guests}
@@ -27,7 +27,7 @@ def allocate(data,time_limit=10):
     for gid in guests:groups[root(gid)].append(guests[gid])
     units=list(groups.values());unit_for={g["id"]:i for i,u in enumerate(units) for g in u}
     locked={(l["resource_id"],l["night"]) for l in data["locks"]}
-    old=data["assignments"]
+    old=[a for a in data["assignments"] if a['guest_id'] in guests]
     fixed=[a for a in old if (a["resource_id"],a["night"]) in locked]
     fixed_keys={(a["guest_id"],a["night"]):a["resource_id"] for a in fixed}
     model=cp_model.CpModel();variables={};options={};scores=[];represented=set();diagnostics={}

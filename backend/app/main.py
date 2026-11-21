@@ -121,7 +121,7 @@ def start_session(db: Session, user: User, response: Response) -> dict:
 @app.get("/api/health")
 def health(db: DB):
     revision = db.scalar(text("SELECT version_num FROM alembic_version"))
-    if revision != "0009_guest_documents":
+    if revision != "0010_guest_probability":
         raise HTTPException(503, "Database migration is pending")
     return {"status": "ok"}
 

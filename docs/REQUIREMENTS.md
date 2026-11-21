@@ -25,6 +25,7 @@ Build a private web-based room-allocation application inside Docker. Support pho
 - The owner explicitly allowed two adults and two children aged 10 or below in a Superior room. Keep actual headcount separate from adult-counted occupancy.
 - The maximum permitted number of young children physically occupying a room has not been supplied. Do not generalise the example into unlimited physical occupancy.
 - Support named individuals, family headcounts, and later completion of names and ages. Do not double-count a family when its named members are entered.
+- Each guest has an integer attendance probability from 0 to 100, initially 100 for every existing and new guest. A value of 50 or more keeps the guest active and fully counted under the normal rules; below 50 moves them to Archive and excludes them from accommodation, allocation, attendance and cost counts. Preserve the person and their IDs/history. Archiving releases their room placements in the same audited change. Raising the value to 50 or more restores the active guest without assigning a room. Owner/editors may change the value; viewers retain their existing read-only scope.
 - Let the owner add or delete a member from a family. Show a review before deleting an existing member, including affected room placements; prevent deletion from a locked room and leave at least one member in a family. Existing attendance and links for a deleted member must no longer affect the active plan.
 - Couples and linked children should stay together. Splitting a family must produce a warning.
 - Unrelated adults may share only when explicitly marked compatible.
@@ -91,6 +92,8 @@ Attach ID images to the correct individual guest; authenticate every read, disab
 The WhatsApp group Final Guest Aadhar is the groom-side source; bride-side collection is under Lists → RSVP. Match existing guest slots before creating people. Uncertain identities remain for review.
 
 Unmatched images may be collected in a private review queue visible to Reception and editors. An editor can attach one to an existing individual after review. Collecting or matching images does not create guest slots or change room assignments. Candidate labels are not verified identities or RSVP confirmations.
+
+Owner clarification on 21 November 2026: make the supplied groom guest list visible in the roster. Reuse people already present and add the remaining source-list slots privately, with 24 November arrival where no date was supplied. Keep uncertain names blank and show source labels and review tags; tentative attendance remains explicitly pending. An ID for someone outside that list does not by itself add another guest. Preserve existing guest fields and placements; adding the list does not assign rooms.
 
 - The owner and full-access editor accounts may edit planning data, assignments, child beds, rooms, tags, rules, rates, imports, locks, overrides, and access settings. The owner account remains unique and cannot be demoted through user administration.
 - Family accounts are view-only and limited to their own side.
