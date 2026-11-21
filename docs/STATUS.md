@@ -2,7 +2,11 @@
 
 ## Explicit single-day attendance — 22 November 2026
 
-The 24 November only tag is implemented across guest displays, dated rooms, allocation, functions, meals and billing. It preserves actual history and releases only excluded-night placements through audited family/Excel edits. Remote verification and deployment of this follow-up are pending; the current deployed release is recorded below.
+The 24 November only tag is implemented across guest displays, dated rooms, allocation, functions, meals and billing. It preserves actual history and releases only excluded-night placements through audited family/Excel edits.
+
+[PR #30](https://github.com/pragalbhdwivedi/wedding-room-planner/pull/30) application head `8d1d6c6d5038e7fccc5862555673bd8a939a1124` passed the frontend production build and 101 isolated PostgreSQL checks on the dedicated host and in [GitHub Actions run 44946326519](https://github.com/pragalbhdwivedi/wedding-room-planner/actions/runs/44946326519). Independent static review findings for solver lock baselines and disjoint-day relationships were corrected and covered by regressions. The tested tree merged as `9c47eb158fda3dff88a86b4a2831d1304dfd8cd7`.
+
+The exact tested images were activated and verified at 20:31:20 UTC on 21 November (22 November in Asia/Kolkata), with four healthy services. No database migration was required; schema remained `0010_guest_probability`. Private before/after fingerprints verified every prior guest column and saved probability, document bytes and links, families, room inventory and placements, users and sessions, access records, history and audits. Private files, credentials, environment settings apart from the application revision, and the database volume were also preserved. Runtime revisions matched the tested images, only web ingress was published, and anonymous operational/ID endpoints returned 401. Deployment and isolated-test receipts are retained privately; no real guest records are included here. Reception hardware and final owner event-use acceptance remain separate checks; backups remain owner-deferred.
 
 ## Attendance probability and Archive — 21 November 2026
 
@@ -20,7 +24,7 @@ The exact application images were deployed at 15:46:10 UTC on 20 November 2026 w
 
 On 21 November the owner reported that groom guests were missing from the web roster. Read-only UI and server checks found that the remaining supplied list had stayed outside the roster during spelling review; the side filter itself was working. D57 authorises completing the private source-list roster with 24 November arrivals, reusing existing people and leaving uncertain names and attendance explicitly pending. The private data correction and its verification are recorded separately from application deployment. Available WhatsApp history and downloads do not establish collection completeness. Live Reception device confirmation and final event-use acceptance remain pending.
 
-Updated 14 November 2026, Asia/Kolkata. Implementation, automated verification, deployment and owner acceptance are separate states.
+Updated 22 November 2026, Asia/Kolkata. Implementation, automated verification, deployment and owner acceptance are separate states.
 
 | Area | State | Evidence / limit |
 | --- | --- | --- |
@@ -34,9 +38,9 @@ Updated 14 November 2026, Asia/Kolkata. Implementation, automated verification, 
 | Attendance | Implemented | Private invitation family directory, dated/timed functions and attendance; separate arrivals/meals; no duplicate accommodation headcounts |
 | Billing | Implemented estimates | Integer paise, per-night allowance, staff meals, explicit inclusion, provisional second-hotel days, unknown-price list and immutable snapshots |
 | Excel and live views | Implemented | Owner guest import preview, stable-ID re-import, scoped multi-sheet exports, revision-only events, reconnect refresh and stale guards |
-| Automated verification | Passed for deployed application | Frontend production build and 89 isolated PostgreSQL checks passed for application head `4b54c931b1d14189bddd95d6a540b2692b00e11d` on the dedicated host and in GitHub Actions run 44934637449 |
+| Automated verification | Passed for deployed application | Frontend production build and 101 isolated PostgreSQL checks passed for application head `8d1d6c6d5038e7fccc5862555673bd8a939a1124` on the dedicated host and in GitHub Actions run 44946326519 |
 | Browser verification | Passed within synthetic/public signed-out scope | Synthetic planner checked the numbered destination picker, clear confirmation, unsaved layout state, save and cancel; public HTTPS serves the new bundle and uncached HTML. Earlier planner workflow checks remain below. |
-| Current real deployment | Running and healthy | `4b54c931b1d14189bddd95d6a540b2692b00e11d`, schema `0010_guest_probability`; four healthy services at the 21 November upgrade; production HTTPS origin, Secure cookies and signed-in browser verification preserved |
+| Current real deployment | Running and healthy | `8d1d6c6d5038e7fccc5862555673bd8a939a1124`, schema `0010_guest_probability` unchanged; four healthy services at the single-day attendance deployment; private data, saved probabilities, credentials, sessions, environment settings and persistent volume preserved |
 | HTTPS / backup / acceptance | Public route verified / other checks deferred | Public HTTP redirects once to HTTPS after the tunnel ingress repair below; HTTPS sign-in and health return 200, signed-out users return 401; owner-device sign-in on this restart has not been repeated; backups owner-deferred; no event-use acceptance yet |
 
 The previous deployed foundation image was `7fee89fde677d594b2183c3e2cf6ec657467bf77`, schema `0001_foundation`; historical evidence is retained in verification/FOUNDATION.md and verification/LAN.md. The planning upgrade adds schema `0002_planning`. It does not rerun setup or replace credentials.
