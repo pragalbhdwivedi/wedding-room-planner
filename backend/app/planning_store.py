@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy import delete, select
 
 from .models import Assignment, Family, Guest, GuestLink, GuestPresence, PlanState, PlanningRule, Resource, Room, RoomConnection, RoomLock
-from .planning_rules import is_active_guest, summaries, validate
+from .planning_rules import is_active_guest, present_on_day, summaries, validate
 
 
 def locked_state(db, expected):
@@ -31,6 +31,17 @@ def set_guest_probability(db, guest, probability):
     return {'guest_id': str(guest.id), 'before': previous, 'after': probability, 'released_assignments': released}
 
 
+def release_unavailable_assignments(db, guest):
+    """Release only explicitly excluded nights; keep identities and attendance history."""
+    if 'only_24_nov' not in guest.tags:return []
+    released=[a for a in assignments(db) if a['guest_id']==str(guest.id) and not present_on_day({'probability':100,'tags':guest.tags},a['night'])]
+    for row in released:
+        db.execute(delete(Assignment).where(Assignment.guest_id==guest.id,Assignment.night==date.fromisoformat(row['night'])))
+    if released:
+        state=db.get(PlanState,1);state.cursor=None;state.redo=[]
+    return released
+
+
 def snapshot(db):
     families=[{"id":str(f.id),"label":f.label,"side":f.side,"reserved_eligible":f.reserved_eligible,"couple_children":f.couple_children,"required_room_type":f.required_room_type} for f in db.scalars(select(Family).order_by(Family.label,Family.id))]
     family_map={f["id"]:f for f in families}
@@ -43,8 +54,8 @@ def snapshot(db):
     for r in db.scalars(select(Resource).order_by(Resource.id)):
         room=rooms.get(r.room_id)
         resources.append({"id":r.id,"number":room.number if room else f"Bed {r.staff_bed_id}","hotel_id":room.hotel_id if room else "staff","category":room.category if room else "dormitory","block":room.block if room else None,"floor":room.floor if room else None,"adult_capacity":room.adult_capacity if room else 1,"bed_type":room.bed_type if room else "single","reserved":r.reserved,"near_restaurant":r.near_restaurant,"x":r.x,"y":r.y})
-    active_ids={g['id'] for g in guests if is_active_guest(g)}
-    return {"families":families,"guests":guests,"resources":resources,"reserved_count":sum(r["reserved"] for r in resources),"assignments":[a for a in assignments(db) if a['guest_id'] in active_ids],
+    guest_map={g['id']:g for g in guests}
+    return {"families":families,"guests":guests,"resources":resources,"reserved_count":sum(r["reserved"] for r in resources),"assignments":[a for a in assignments(db) if a['guest_id'] in guest_map and present_on_day(guest_map[a['guest_id']],a['night'])],
             "locks":[{"resource_id":l.resource_id,"night":l.night.isoformat()} for l in db.scalars(select(RoomLock))],
             "links":[{"id":str(l.id),"a":str(l.a),"b":str(l.b),"kind":l.kind,"severity":l.severity} for l in db.scalars(select(GuestLink))],
             "connections":[{"a":c.a,"b":c.b,"kind":c.kind} for c in db.scalars(select(RoomConnection))],
@@ -83,6 +94,9 @@ def save_assignments(db,rows):
     ids={uuid.UUID(a['guest_id']) for a in rows}
     if ids and db.scalar(select(Guest.id).where(Guest.id.in_(ids),Guest.probability<50).limit(1)):
         raise HTTPException(409,"An archived guest cannot be assigned. Restore their probability to at least 50% first.")
+    guests={str(g.id):g for g in db.scalars(select(Guest).where(Guest.id.in_(ids)))}
+    if any(a['guest_id'] in guests and not present_on_day({'probability':guests[a['guest_id']].probability,'tags':guests[a['guest_id']].tags},a['night']) for a in rows):
+        raise HTTPException(409,"A guest present on 24 November only cannot be assigned on another night.")
     db.execute(delete(Assignment))
     db.add_all([Assignment(guest_id=uuid.UUID(a["guest_id"]),night=date.fromisoformat(a["night"]),resource_id=a["resource_id"],separate_bed=a.get("separate_bed",False)) for a in rows])
     db.flush()

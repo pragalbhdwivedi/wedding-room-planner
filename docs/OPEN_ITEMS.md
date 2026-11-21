@@ -26,6 +26,8 @@ These remain open as of the 19 October 2026 baseline. Do not invent answers. Mos
 
 ## Explicitly deferred, not blocking the document baseline
 
+An owner-confirmed one-day guest can use D59's explicit 24 November only attendance limit. Other uncertain stay dates and actual departure times remain private inputs; a one-day source note alone does not choose them.
+
 Guest ID document retention and post-event disposal remain owner decisions. Reception viewing/printing is authorised; no automatic authenticity verification or permission to publish documents is implied. Under D57, the supplied groom list may appear in the roster while uncertain names remain blank with visible review tags. Unresolved name spellings, companion identities and tentative attendance still need confirmation; ID-only people outside the source list remain separate. Uncertain OCR/name matches stay in the private unmatched collection. Available WhatsApp history and attachments do not establish collection completeness; live Reception device confirmation remains pending.
 
 One-time invitation function/family transfer and theme reuse are now authorised. Automatic RSVP synchronisation remains outside the approved implementation scope. The core planning workflows are implemented. Physical and cost questions above remain explicit inputs; they are not silently resolved by a successful solver run. See STATUS.md for exact verification and deployment evidence.

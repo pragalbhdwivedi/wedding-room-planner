@@ -14,8 +14,8 @@ from sqlalchemy import select
 
 from .models import Family, Guest, PendingChange, now
 from .planning_api import ApplyInput, DB, GuestInput, Editor, Viewer, WRITE, billing_data, event_data, meal_rows, probability_changes, record
-from .planning_rules import is_active_guest, issue, validate
-from .planning_store import locked_state, set_guest_probability, snapshot, visible_plan
+from .planning_rules import is_active_guest, issue, present_on_day, validate
+from .planning_store import locked_state, release_unavailable_assignments, set_guest_probability, snapshot, visible_plan
 
 router=APIRouter(prefix="/api/planning")
 HEADERS=['Guest ID','Family ID','Group','Side','Reserved eligible','Couple with children','Name','Age','Category','Phone','Arrival','Tags','Private notes','Age band','Gender','Sharing mode','Family room type','Probability']
@@ -155,13 +155,15 @@ def parse_import(content,current):
         for key in ['side','reserved_eligible','couple_children','required_room_type']:g[key]=f[key]
     if len(merged['guests'])>1000:errors.append({'row':None,'message':'The event supports at most 1,000 guest slots.'})
     active_ids={g['id'] for g in merged['guests'] if is_active_guest(g)}
-    checked=validate(merged,[a for a in current['assignments'] if a['guest_id'] in active_ids])
+    merged_guests={g['id']:g for g in merged['guests']}
+    checked=validate(merged,[a for a in current['assignments'] if a['guest_id'] in active_ids and present_on_day(merged_guests[a['guest_id']],a['night'])])
     previous=validate(current,current['assignments'])
     old_errors={e['id'] for e in previous['errors']}
     errors.extend({'row':None,'message':i['message']} for i in checked['errors'] if i['id'] not in old_errors)
     old_warnings={w['id'] for w in previous['warnings']}
     warnings.extend(w for w in checked['warnings'] if w['id'] not in old_warnings)
-    return {'families':list(families.values()),'guests':list(guests.values())},errors,warnings
+    released=[a for a in current['assignments'] if a['guest_id'] in guests and not present_on_day({**guests[a['guest_id']],'probability':100},a['night'])]
+    return {'families':list(families.values()),'guests':list(guests.values()),'day_scope_released_assignments':released},errors,warnings
 
 
 @router.post('/import/preview',dependencies=WRITE)
@@ -170,7 +172,7 @@ async def import_preview(file:UploadFile,revision:int,user:Editor,db:DB):
     content=await file.read(5*1024*1024+1);await file.close()
     if len(content)>5*1024*1024:raise HTTPException(413,'Workbook exceeds the 5 MiB limit')
     locked_state(db,revision);payload,errors,warnings=parse_import(content,snapshot(db))
-    result={'revision':revision,'errors':errors,'warnings':warnings,'token':None,'families':len(payload['families']),'guests':len(payload['guests'])}
+    result={'revision':revision,'errors':errors,'warnings':warnings,'token':None,'families':len(payload['families']),'guests':len(payload['guests']),'day_scope_released_assignments':payload.get('day_scope_released_assignments',[])}
     if errors or not payload['guests']:return result
     pending=PendingChange(owner_id=user.id,revision=revision,kind='import',payload=payload,warnings=warnings,expires_at=now()+timedelta(minutes=10))
     db.add(pending);db.commit();result['token']=str(pending.id)
@@ -182,7 +184,7 @@ def apply_import(body:ApplyInput,user:Editor,db:DB):
     state=locked_state(db,body.revision);pending=db.get(PendingChange,body.token)
     if not pending or pending.kind!='import' or pending.owner_id!=user.id or pending.expires_at<=now() or pending.revision!=state.revision:raise HTTPException(409,'Import preview expired or changed; upload and preview again')
     if set(body.acknowledged)!={w['id'] for w in pending.warnings}:raise HTTPException(409,'Review and acknowledge the exact import warnings')
-    before=snapshot(db)
+    before=snapshot(db);released=[]
     for f in pending.payload['families']:
         row=db.get(Family,uuid.UUID(f['id']))
         if not row:row=Family(id=uuid.UUID(f['id']));db.add(row)
@@ -194,6 +196,7 @@ def apply_import(body:ApplyInput,user:Editor,db:DB):
         for k in ['name','age','age_band','gender','sharing_mode','category','phone','tags','notes']:setattr(row,k,g[k])
         set_guest_probability(db,row,g.get('probability',row.probability if row.probability is not None else 100))
         row.arrival=date.fromisoformat(g['arrival']) if g['arrival'] else None
+        released.extend(release_unavailable_assignments(db,row))
     db.flush();after=snapshot(db);checked=validate(after,after['assignments'])
     previous=validate(before,before['assignments'])
     new_errors=[e for e in checked['errors'] if e['id'] not in {old['id'] for old in previous['errors']}]
@@ -201,4 +204,4 @@ def apply_import(body:ApplyInput,user:Editor,db:DB):
     old={w['id'] for w in previous['warnings']}
     if not {w['id'] for w in checked['warnings'] if w['id'] not in old}.issubset(set(body.acknowledged)):raise HTTPException(409,'Import conditions changed; preview again')
     count=len(pending.payload['guests']);changes=probability_changes(before,pending.payload['guests']);db.delete(pending)
-    return record(db,user,state,'import.applied',{'rows':count,'warning_ids':body.acknowledged,'probability_changes':changes})
+    return record(db,user,state,'import.applied',{'rows':count,'warning_ids':body.acknowledged,'probability_changes':changes,'day_scope_released_assignments':released})

@@ -47,6 +47,7 @@ Build a private web-based room-allocation application inside Docker. Support pho
 
 - Default check-in time: 2 PM on the guest's selected arrival date, either 24 or 25 November.
 - All guests check out on 26 November 2026 at 11 AM.
+- An explicitly confirmed **24 November only** guest is eligible for the 24 November night, meals and functions, and excluded from other event dates. The visible attendance tag controls counts, assignment eligibility and allocation as one rule. Saving it releases only placements on excluded nights; removing it leaves those placements unassigned. Keep actual arrival/departure timestamps and attendance history separate, and do not invent an actual checkout time.
 - Record arrivals, departures, events, and individual meals separately. Reception-only attendance is not automatically an overnight stay.
 - Show occupancy, availability, meal counts, and costs for the selected date/night. Preserve room availability over time rather than treating a room as used forever after one assignment.
 

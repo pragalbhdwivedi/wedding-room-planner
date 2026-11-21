@@ -9,6 +9,7 @@ const presets: Record<string, string> = {
   second_hotel_only: "Second hotel only",
   arrival_unconfirmed: "Arrival date needs confirmation",
   headcount_unconfirmed: "Complete headcount needs confirmation",
+  only_24_nov: "24 November only",
 };
 const privateMetadata = (tag: string) =>
   /^(slot_|source_list_|role_|relation_)/.test(tag);
@@ -54,6 +55,7 @@ export function TagPicker({
   return (
     <fieldset className="tag-picker">
       <legend>Tick the tags</legend>
+      {value.includes("only_24_nov") && <p className="form-help">Rooms, meals and functions are limited to 24 November. Saving releases room placements on other nights.</p>}
       <label>
         Find a tag
         <input

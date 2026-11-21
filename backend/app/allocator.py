@@ -4,7 +4,7 @@ from itertools import combinations
 
 from ortools.sat.python import cp_model
 
-from .planning_rules import NIGHTS, STAFF, active, building, capacity_ok, compatible, friend_rosters, is_active_guest, is_adult, matches, resource_issues, segment, validate
+from .planning_rules import NIGHTS, STAFF, active, building, capacity_ok, compatible, friend_rosters, is_active_guest, is_adult, matches, present_on_day, resource_issues, segment, validate
 
 
 def allocate(data,time_limit=10):
@@ -22,12 +22,12 @@ def allocate(data,time_limit=10):
     for members in families.values():
         for member in members[1:]:union(members[0],member)
     for link in data["links"]:
-        if link["kind"]=="must_share" and link["severity"]=="hard" and link["a"] in guests and link["b"] in guests:union(link["a"],link["b"])
+        if link["kind"]=="must_share" and link["severity"]=="hard" and link["a"] in guests and link["b"] in guests and any(active(guests[link['a']],n) and active(guests[link['b']],n) for n in NIGHTS):union(link["a"],link["b"])
     groups=defaultdict(list)
     for gid in guests:groups[root(gid)].append(guests[gid])
     units=list(groups.values());unit_for={g["id"]:i for i,u in enumerate(units) for g in u}
     locked={(l["resource_id"],l["night"]) for l in data["locks"]}
-    old=[a for a in data["assignments"] if a['guest_id'] in guests]
+    old=[a for a in data["assignments"] if a['guest_id'] in guests and present_on_day(guests[a['guest_id']],a['night'])]
     fixed=[a for a in old if (a["resource_id"],a["night"]) in locked]
     fixed_keys={(a["guest_id"],a["night"]):a["resource_id"] for a in fixed}
     model=cp_model.CpModel();variables={};options={};scores=[];represented=set();diagnostics={}
@@ -39,7 +39,7 @@ def allocate(data,time_limit=10):
             if hard:reasons.extend(x["message"] for x in hard);continue
             if any(not capacity_ok([g for g in people if active(g,n)],r) for n in NIGHTS):
                 reasons.append("The complete family/group does not fit the confirmed room capacity; review a manual split.");continue
-            if any(not compatible(a,b,data["links"]) for a,b in combinations(people,2)):
+            if any(not compatible(a,b,data["links"]) and any(active(a,n) and active(b,n) for n in NIGHTS) for a,b in combinations(people,2)):
                 reasons.append("This group has a mandatory sharing exclusion.");continue
             valid=True
             for n in NIGHTS:
@@ -103,6 +103,7 @@ def allocate(data,time_limit=10):
         model.add(sum(held)<=len(premium_usage)-4)
     for link in data['links']:
         if link['severity']!='hard' or link['kind'] not in {'nearby','same_building'} or link['a'] not in unit_for or link['b'] not in unit_for:continue
+        if not any(active(guests[link['a']],n) and active(guests[link['b']],n) for n in NIGHTS):continue
         i,j=unit_for[link['a']],unit_for[link['b']]
         if i==j:continue
         if options[i] and options[j]:

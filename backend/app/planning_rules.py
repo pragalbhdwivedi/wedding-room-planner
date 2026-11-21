@@ -12,6 +12,11 @@ def is_active_guest(guest):
     return guest.get("probability", 100) >= 50
 
 
+def present_on_day(guest, day):
+    """Explicit day limits apply to rooms, functions and meals, not actual history."""
+    return is_active_guest(guest) and day in DAYS and ("only_24_nov" not in guest.get("tags", []) or day == DAYS[0])
+
+
 def age_band(guest):
     age=guest.get("age")
     return ("adult" if age>10 else "child") if age is not None else guest.get("age_band","unknown")
@@ -21,7 +26,7 @@ def is_adult(guest):return age_band(guest)=="adult"
 
 
 def counted_hotel_guest(guest, assignment):
-    return is_active_guest(guest) and guest["category"]=="guest" and (is_adult(guest) or age_band(guest)=="child" and assignment.get("separate_bed",False))
+    return present_on_day(guest, assignment["night"]) and guest["category"]=="guest" and (is_adult(guest) or age_band(guest)=="child" and assignment.get("separate_bed",False))
 
 
 def is_friend(guest):
@@ -37,7 +42,7 @@ def friend_pair(a,b):
 
 
 def active(guest, night):
-    return is_active_guest(guest) and guest.get("arrival") in NIGHTS and guest["arrival"] <= night <= NIGHTS[-1]
+    return present_on_day(guest, night) and guest.get("arrival") in NIGHTS and guest["arrival"] <= night <= NIGHTS[-1]
 
 
 def matches(guest, rule):
@@ -128,6 +133,8 @@ def validate(snapshot, assignments, *, before=None):
         g,r = guests[gid], resources[rid]
         if not is_active_guest(g):
             result.append(issue("archived_guest", "This guest is archived below 50% probability. Restore them before assigning a room or bed.", guests=[gid], night=night));continue
+        if not present_on_day(g,night):
+            result.append(issue("unavailable_day", "This guest is present on 24 November only and cannot be assigned on another night.", guests=[gid], night=night));continue
         if not active(g,night):result.append(issue("stay", "The guest is not resident on this night.", guests=[gid], night=night))
         for item in resource_issues(g,r,snapshot):
             item["night"]=night;item["id"] += ":"+night;result.append(item)
@@ -173,7 +180,7 @@ def validate(snapshot, assignments, *, before=None):
                 for people in parts.values():
                     if len({g["side"] for g in people})>1:result.append(issue("rule_"+rule["id"],rule["name"],severity=rule["severity"],guests=[g["id"] for g in people],resources={by_guest[(g["id"],night)] for g in people},night=night))
     if before is not None:
-        def occupants(values,rid,night):return {a["guest_id"] for a in values if a["resource_id"]==rid and a["night"]==night and (a['guest_id'] not in guests or is_active_guest(guests[a['guest_id']]))}
+        def occupants(values,rid,night):return {a["guest_id"] for a in values if a["resource_id"]==rid and a["night"]==night and (a['guest_id'] not in guests or present_on_day(guests[a['guest_id']],night))}
         for lock in snapshot.get("locks",[]):
             rid,night=lock["resource_id"],lock["night"]
             if occupants(before,rid,night)!=occupants(assignments,rid,night):result.append(issue("locked", "This move changes a locked room or bed.",resources=[rid],night=night))

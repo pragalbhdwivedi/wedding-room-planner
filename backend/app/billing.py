@@ -1,11 +1,11 @@
 """Exact-pa​ise estimates with explicit missing-price and coverage boundaries."""
-from .planning_rules import DAYS, NIGHTS, STAFF, active, age_band, counted_hotel_guest, is_active_guest, is_adult
+from .planning_rules import DAYS, NIGHTS, STAFF, active, age_band, counted_hotel_guest, is_active_guest, is_adult, present_on_day
 
 
 def calculate(snapshot, policy, settings, meals, charge_days, *, basis="planned"):
     guests={g["id"]:g for g in snapshot["guests"] if is_active_guest(g)}
     resources={r["id"]:r for r in snapshot["resources"]}
-    rows=[a for a in snapshot["assignments"] if a['guest_id'] in guests]
+    rows=[a for a in snapshot["assignments"] if a['guest_id'] in guests and present_on_day(guests[a['guest_id']],a['night'])]
     lines=[];unpriced=[];night_totals={}
     for night in NIGHTS:
         night_rows=[a for a in rows if a["night"]==night]
@@ -32,7 +32,7 @@ def calculate(snapshot, policy, settings, meals, charge_days, *, basis="planned"
         lines.append({"day":day,"kind":"second_hotel_property","quantity":1,"rate_paise":policy["second_hotel_day_paise"],"amount_paise":policy["second_hotel_day_paise"],"status":"provisional"})
     for attendance in meals:
         g=guests.get(attendance["guest_id"])
-        if not g:continue
+        if not g or not present_on_day(g,attendance['day']):continue
         present=attendance["planned"] if basis=="planned" else attendance["actual"]
         if present is None:
             if attendance["planned"]:unpriced.append({"day":attendance["day"],"kind":"attendance_unknown","quantity":1,"reason":"Actual attendance has not been recorded."})
